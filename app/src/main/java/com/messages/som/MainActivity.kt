@@ -336,7 +336,7 @@ private fun ConversationRow(t: SmsThread, onClick: () -> Unit) {
                 Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(t.date)), color = Color(0xFF7F8998), fontSize = 11.sp)
             }
             Spacer(Modifier.height(3.dp))
-            LinkHighlightedText(text = t.preview.replace("\n", " "), hasLink = t.hasLink, baseColor = if (t.unread) Color.White else Color(0xFF9AA4B2))
+            LinkHighlightedText(text = t.preview.replace('\n', ' '), hasLink = t.hasLink, baseColor = if (t.unread) Color.White else Color(0xFF9AA4B2))
         }
     }
 }
@@ -360,17 +360,11 @@ private fun LinkHighlightedText(text: String, hasLink: Boolean, baseColor: Color
 }
 
 private fun buildLinkAnnotatedString(text: String, baseColor: Color): AnnotatedString = buildAnnotatedString {
+    append(text)
     val matcher = URL_PATTERN.matcher(text)
-    var cursor = 0
     while (matcher.find()) {
-        if (matcher.start() > cursor) withStyle(SpanStyle(color = baseColor)) { append(text.substring(cursor, matcher.start())) }
-        val raw = text.substring(matcher.start(), matcher.end())
-        val link = raw.trimEnd('.', ',', '!', '?', ')', ']', ';')
-        withStyle(SpanStyle(color = Color(0xFF9BB7FF), fontWeight = FontWeight.Bold)) { append(link) }
-        if (link.length < raw.length) withStyle(SpanStyle(color = baseColor)) { append(raw.substring(link.length)) }
-        cursor = matcher.end()
+        addStyle(SpanStyle(color = Color(0xFF9BB7FF), fontWeight = FontWeight.Bold), matcher.start(), matcher.end())
     }
-    if (cursor < text.length) withStyle(SpanStyle(color = baseColor)) { append(text.substring(cursor)) }
 }
 
 @Composable
