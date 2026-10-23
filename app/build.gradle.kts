@@ -22,11 +22,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
-
-kotlinOptions { jvmTarget = "17" }
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.02.00"))
