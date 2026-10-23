@@ -206,7 +206,7 @@ private fun MessagesHome(activity: MainActivity) {
                     }
                 }
             } else {
-                LazyColumn(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp, bottom = 110.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                LazyColumn(contentPadding = PaddingValues(start = 12.dp, top = 8.dp, end = 12.dp, bottom = 110.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     items(filtered, key = { it.address }) { t ->
                         ConversationRow(t) { activity.startActivity(Intent(activity, ThreadActivity::class.java).putExtra("address", t.address)) }
                     }
