@@ -1,3 +1,17 @@
 # Messages SOM
 
-Native Android messaging app project.
+Native Android SMS and app-to-app messaging foundation.
+
+## Included
+- Modern dark native Android UI
+- SMS inbox and compose flow
+- Contacts picker
+- Send/receive SMS receiver and notifications
+- Default SMS role request
+- Firebase Auth/Firestore/FCM integration hooks
+- Firestore security rules template
+- GitHub Actions debug APK build
+- Custom Messages SOM app mark
+
+## Firebase setup
+Add your own `app/google-services.json` and enable Firebase Authentication, Firestore and Cloud Messaging in your Firebase project. Never commit private service-account credentials.
