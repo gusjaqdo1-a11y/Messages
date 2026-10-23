@@ -26,7 +26,7 @@ android {
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 
-kotlin { jvmToolchain(17) }
+kotlinOptions { jvmTarget = "17" }
 
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2025.02.00"))
