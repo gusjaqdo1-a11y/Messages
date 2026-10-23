@@ -11,6 +11,7 @@ import android.provider.Telephony
 import android.telephony.SmsManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -62,11 +63,6 @@ private fun unreadCount(context: Context, address: String): Int {
     return runCatching { context.contentResolver.query(Telephony.Sms.CONTENT_URI, arrayOf(Telephony.Sms._ID), "address=? AND read=0", arrayOf(address), null)?.use { it.count } ?: 0 }.getOrDefault(0)
 }
 
-fun markThreadRead(context: Context, address: String) {
-    if (address.isBlank() || ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) return
-    runCatching { context.contentResolver.update(Telephony.Sms.CONTENT_URI, ContentValues().apply { put(Telephony.Sms.READ, 1) }, "address=? AND read=0", arrayOf(address)) }
-}
-
 private fun deleteMessage(context: Context, id: Long) {
     if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) return
     runCatching { context.contentResolver.delete(Uri.withAppendedPath(Telephony.Sms.CONTENT_URI, id.toString()), null, null) }
@@ -96,9 +92,7 @@ private fun ThreadScreen(activity: ThreadActivity, address: String) {
     val canReply = isWritableDestination(address)
     val title = displayContactName(activity, address)
 
-    LaunchedEffect(Unit) {
-        while (true) { messages = loadThread(activity, address); unread = unreadCount(activity, address); delay(1200) }
-    }
+    LaunchedEffect(Unit) { while (true) { messages = loadThread(activity, address); unread = unreadCount(activity, address); delay(1200) } }
 
     Scaffold(containerColor = Color(0xFF090B0F), topBar = {
         TopAppBar(title = { Column { Text(title, color = Color.White, fontSize = 17.sp); Text(if (title != address) address else if (canReply) "SMS conversation" else "Sender ID • no replies", color = Color(0xFF8B95A4), fontSize = 11.sp) } }, navigationIcon = { IconButton({ activity.finish() }) { Icon(Icons.Default.ArrowBack, null, tint = Color.White) } }, actions = {
@@ -117,7 +111,7 @@ private fun ThreadScreen(activity: ThreadActivity, address: String) {
             }
             if (unread > 0) Surface(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 14.dp), color = Color(0xFF222A3A), shadowElevation = 8.dp, shape = RoundedCornerShape(24.dp)) {
                 Row(Modifier.padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { val index = messages.indexOfFirst { it.incoming && it.id > (messages.firstOrNull { !it.incoming }?.id ?: Long.MIN_VALUE) }; val target = if (index >= 0) index else maxOf(0, messages.size - unread); activity.lifecycleScope.launch { listState.animateScrollToItem(target) } }, modifier = Modifier.size(38.dp)) { Icon(Icons.Default.KeyboardArrowDown, "Jump to unread", tint = Color.White) }
+                    IconButton(onClick = { val target = maxOf(0, messages.size - unread); activity.lifecycleScope.launch { listState.animateScrollToItem(target) } }, modifier = Modifier.size(38.dp)) { Icon(Icons.Default.KeyboardArrowDown, "Jump to unread", tint = Color.White) }
                     Text(if (unread > 99) "99+ new messages" else "$unread new messages", color = Color.White, fontSize = 13.sp)
                 }
             }
@@ -125,11 +119,12 @@ private fun ThreadScreen(activity: ThreadActivity, address: String) {
         }
     }
 
-    if (showDeleteDialog) AlertDialog(onDismissRequest = { showDeleteDialog = false }, title = { Text("Delete conversation?") }, text = { Text("All SMS messages in this conversation will be removed from the device.") }, confirmButton = { TextButton(onClick = { deleteThread(activity, address); showDeleteDialog = false; activity.finish() }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } })
+    if (showDeleteDialog) AlertDialog(onDismissRequest = { showDeleteDialog = false }, title = { Text("Delete conversation?") }, text = { Text("All SMS messages in this conversation will be removed from the device.") }, confirmButton = { TextButton(onClick = { deleteThreadConversation(activity, address); showDeleteDialog = false; activity.finish() }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text("Cancel") } })
 }
 
-private fun deleteThread(context: Context, address: String) { if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) return; runCatching { context.contentResolver.delete(Telephony.Sms.CONTENT_URI, "address=?", arrayOf(address)) } }
+private fun deleteThreadConversation(context: Context, address: String) { if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) return; runCatching { context.contentResolver.delete(Telephony.Sms.CONTENT_URI, "address=?", arrayOf(address)) } }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageBubble(message: SmsItem, onCopy: () -> Unit, onDelete: () -> Unit, onLink: (String) -> Unit) {
     var menu by remember { mutableStateOf(false) }
