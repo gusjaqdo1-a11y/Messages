@@ -38,7 +38,7 @@ private fun ComposeScreen(activity: Activity, initial: String) {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { uri ->
         if (uri != null) activity.contentResolver.query(uri, arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER), null, null, null)?.use { c -> if (c.moveToFirst()) address = c.getString(0) }
     }
-    val canReply = address.isBlank() || isWritableDestination(address)
+    val canReply = isWritableDestination(address)
     Scaffold(
         containerColor = Color(0xFF090B0F),
         topBar = {
@@ -50,14 +50,14 @@ private fun ComposeScreen(activity: Activity, initial: String) {
         }
     ) { pad ->
         Column(Modifier.fillMaxSize().background(Color(0xFF090B0F)).padding(pad).padding(horizontal = 18.dp, vertical = 10.dp)) {
-            if (!canReply) {
+            if (address.isNotBlank() && !canReply) {
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF241D16)), shape = RoundedCornerShape(18.dp)) {
                     Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Info, null, tint = Color(0xFFFFC978))
                         Spacer(Modifier.width(10.dp))
                         Column {
                             Text("Sender ID", color = Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
-                            Text("This sender cannot receive replies. The keyboard is disabled.", color = Color(0xFFD0BFA7), fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                            Text("This sender cannot receive replies. The message keyboard is disabled.", color = Color(0xFFD0BFA7), fontSize = MaterialTheme.typography.bodySmall.fontSize)
                         }
                     }
                 }
@@ -69,8 +69,7 @@ private fun ComposeScreen(activity: Activity, initial: String) {
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 label = { Text("To") },
-                placeholder = { Text("Phone number") },
-                enabled = canReply || address.isBlank(),
+                placeholder = { Text("Phone number or recipient") },
                 trailingIcon = { IconButton({ picker.launch(null) }) { Icon(Icons.Default.PersonAdd, "Choose contact") } }
             )
             Spacer(Modifier.height(14.dp))
