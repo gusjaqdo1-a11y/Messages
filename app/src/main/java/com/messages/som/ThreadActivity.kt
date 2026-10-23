@@ -1,6 +1,7 @@
 package com.messages.som
 
 import android.Manifest
+import android.content.ContentValues
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
@@ -38,7 +39,20 @@ class ThreadActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val address = intent.getStringExtra("address") ?: ""
+        markThreadRead(address)
         setContent { MessagesSomTheme { ThreadScreen(this, address) } }
+    }
+
+    private fun markThreadRead(address: String) {
+        if (address.isBlank() || ContextCompat.checkSelfPermission(this, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) return
+        runCatching {
+            contentResolver.update(
+                Telephony.Sms.CONTENT_URI,
+                ContentValues().apply { put(Telephony.Sms.READ, 1) },
+                "address=? AND read=0",
+                arrayOf(address)
+            )
+        }
     }
 }
 
