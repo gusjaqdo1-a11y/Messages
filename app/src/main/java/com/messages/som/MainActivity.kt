@@ -28,7 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.clip
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -210,4 +210,10 @@ private fun buildLinkAnnotatedString(text: String, baseColor: Color) = buildAnno
     var last = 0; val m = URL_PATTERN.matcher(text)
     while (m.find()) { append(text.substring(last, m.start())); withStyle(androidx.compose.ui.text.SpanStyle(color = Color(0xFF9BB7FF), fontWeight = FontWeight.SemiBold, textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)) { append(m.group()) }; last = m.end() }
     append(text.substring(last))
+}
+
+@Composable
+fun MessagesSomTheme(content: @Composable () -> Unit) {
+    val scheme = darkColorScheme(primary = Color(0xFF9BB7FF), onPrimary = Color(0xFF0B0E13), secondary = Color(0xFFB7C5E8), background = Color(0xFF080A0E), surface = Color(0xFF11151B), onBackground = Color.White, onSurface = Color.White)
+    MaterialTheme(colorScheme = scheme, content = content)
 }
