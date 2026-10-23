@@ -26,6 +26,7 @@ class ArchiveActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ArchiveScreen(activity: ArchiveActivity) {
     var addresses by remember { mutableStateOf(archivedAddresses(activity).toList().sorted()) }
