@@ -75,6 +75,10 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".SmsStatusReceiver"
+            android:exported="false" />
+
         <service android:name=".data.MessagesFirebaseService" android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
