@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import crypto from 'node:crypto';
-import { defaults, id, readData, writeData } from '@/lib/store';
+import { defaults, id, readData, writeData } from '../../../lib/store';
 
 async function authorized() {
   const c = (await cookies()).get('messages_admin')?.value;
