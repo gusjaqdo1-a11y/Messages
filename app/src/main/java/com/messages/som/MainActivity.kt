@@ -134,17 +134,7 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
     }, floatingActionButton = { FloatingActionButton(onClick = { activity.startActivity(Intent(activity, ComposeActivity::class.java)) }, containerColor = Color(0xFFA8C7FA), contentColor = Color(0xFF0A305F)) { Icon(Icons.Default.Edit, "New message") } }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
             OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, placeholder = { Text("Search conversations") }, shape = RoundedCornerShape(28.dp))
-            if (!defaultSms) {
-                Surface(color = Color(0xFF171D26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Sms, null, tint = Color(0xFFA8C7FA)); Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) { Text("Make Messages SOM your SMS app", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Required for full SMS control and sending.", color = Color(0xFF9EA8B8), fontSize = 12.sp) }
-                        TextButton(onClick = requestRole) { Text("Set up") }
-                    }
-                }
-            } else {
-                Spacer(Modifier.height(0.dp))
-            }
+            SetupBanner(defaultSms, requestRole)
             if (filtered.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.MarkUnreadChatAlt, null, tint = Color(0xFF718096), modifier = Modifier.size(52.dp)); Spacer(Modifier.height(10.dp)); Text(if (query.isBlank()) "No conversations yet" else "No results", color = Color.White, fontSize = 18.sp); Text(if (query.isBlank()) "Use the chat icon for Messages SOM users, or compose an SMS.", color = Color(0xFF8993A3)) }
@@ -157,21 +147,45 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
 }
 
 @Composable
+private fun SetupBanner(defaultSms: Boolean, requestRole: () -> Unit) {
+    if (defaultSms) {
+        Spacer(Modifier.height(0.dp))
+        return
+    }
+    Surface(color = Color(0xFF171D26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Sms, null, tint = Color(0xFFA8C7FA)); Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) { Text("Make Messages SOM your SMS app", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Required for full SMS control and sending.", color = Color(0xFF9EA8B8), fontSize = 12.sp) }
+            TextButton(onClick = requestRole) { Text("Set up") }
+        }
+    }
+}
+
+@Composable
 private fun ConversationRow(activity: MainActivity, c: Conversation, refresh: () -> Unit) {
     val name = displayContactName(activity, c.address)
+    val nameWeight = if (c.unread > 0) FontWeight.Bold else FontWeight.Medium
+    val bodyColor = if (c.unread > 0) Color(0xFFE2E6ED) else Color(0xFF929BAA)
     Row(Modifier.fillMaxWidth().clickable { activity.startActivity(Intent(activity, ThreadActivity::class.java).putExtra("address", c.address)) }.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(52.dp).clip(CircleShape).background(Color(0xFF252B35)), contentAlignment = Alignment.Center) { Text(name.take(1).uppercase(), color = Color(0xFFA8C7FA), fontSize = 20.sp, fontWeight = FontWeight.Bold) }
         Spacer(Modifier.width(13.dp)); Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) { Text(name, color = Color.White, fontSize = 16.sp, fontWeight = if (c.unread > 0) FontWeight.Bold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(c.date)), color = Color(0xFF8F98A8), fontSize = 11.sp) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(c.body, color = if (c.unread > 0) Color(0xFFE2E6ED) else Color(0xFF929BAA), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                if (c.unread > 0) {
-                    Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (c.unread > 99) "99+" else c.unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) }
-                } else {
-                    Spacer(Modifier.width(0.dp))
-                }
-            }
-            if (containsLink(c.body)) Text("LINK", color = Color(0xFFA8C7FA), fontSize = 9.sp, fontWeight = FontWeight.Bold) else Spacer(Modifier.height(0.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) { Text(name, color = Color.White, fontSize = 16.sp, fontWeight = nameWeight, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(c.date)), color = Color(0xFF8F98A8), fontSize = 11.sp) }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text(c.body, color = bodyColor, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); UnreadBadge(c.unread) }
+            LinkBadge(c.body)
         }
     }
+}
+
+@Composable
+private fun UnreadBadge(unread: Int) {
+    if (unread > 0) {
+        Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (unread > 99) "99+" else unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) }
+    } else {
+        Spacer(Modifier.width(0.dp))
+    }
+}
+
+@Composable
+private fun LinkBadge(body: String) {
+    if (containsLink(body)) Text("LINK", color = Color(0xFFA8C7FA), fontSize = 9.sp, fontWeight = FontWeight.Bold) else Spacer(Modifier.height(0.dp))
 }
