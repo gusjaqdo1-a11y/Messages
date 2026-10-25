@@ -26,7 +26,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.clip
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -142,12 +142,8 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
             TopAppBar(
                 title = { Text("Messages SOM", color = Color.White, fontWeight = FontWeight.SemiBold) },
                 actions = {
-                    IconButton(onClick = { activity.startActivity(Intent(activity, AppMessagesActivity::class.java)) }) {
-                        Icon(Icons.Default.ChatBubbleOutline, "Messages SOM chat", tint = Color.White)
-                    }
-                    IconButton(onClick = { activity.startActivity(Intent(activity, ArchiveActivity::class.java)) }) {
-                        Icon(Icons.Default.Archive, "Archived", tint = Color.White)
-                    }
+                    IconButton(onClick = { activity.startActivity(Intent(activity, AppMessagesActivity::class.java)) }) { Icon(Icons.Default.ChatBubbleOutline, "Messages SOM chat", tint = Color.White) }
+                    IconButton(onClick = { activity.startActivity(Intent(activity, ArchiveActivity::class.java)) }) { Icon(Icons.Default.Archive, "Archived", tint = Color.White) }
                     Box {
                         IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "More", tint = Color.White) }
                         DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
@@ -159,9 +155,7 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { activity.startActivity(Intent(activity, ComposeActivity::class.java)) }, containerColor = Color(0xFFA8C7FA), contentColor = Color(0xFF0A305F)) {
-                Icon(Icons.Default.Edit, "New message")
-            }
+            FloatingActionButton(onClick = { activity.startActivity(Intent(activity, ComposeActivity::class.java)) }, containerColor = Color(0xFFA8C7FA), contentColor = Color(0xFF0A305F)) { Icon(Icons.Default.Edit, "New message") }
         }
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
@@ -169,7 +163,7 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
             if (!defaultSms) {
                 Surface(color = Color(0xFF171D26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Sms, null, tint = Color(0xFFA8C7FA)); Spacer(Modifier.width(10.dp))
+                        Icon(Icons.Default.Sms, null, tint = Color(0xFFA8C7FA]); Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) { Text("Make Messages SOM your SMS app", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Required for full SMS control and sending.", color = Color(0xFF9EA8B8), fontSize = 12.sp) }
                         TextButton(onClick = requestRole) { Text("Set up") }
                     }
