@@ -1,0 +1,1 @@
+{"name":"messages-som-api","version":"1.0.0","private":true,"scripts":{"build":"next build","start":"next start","dev":"next dev"},"dependencies":{"@vercel/blob":"^2.6.1","next":"latest","react":"latest","react-dom":"latest"},"devDependencies":{"@types/node":"latest","@types/react":"latest","@types/react-dom":"latest","typescript":"latest"}}
