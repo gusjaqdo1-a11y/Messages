@@ -134,16 +134,22 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
     }, floatingActionButton = { FloatingActionButton(onClick = { activity.startActivity(Intent(activity, ComposeActivity::class.java)) }, containerColor = Color(0xFFA8C7FA), contentColor = Color(0xFF0A305F)) { Icon(Icons.Default.Edit, "New message") } }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
             OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, placeholder = { Text("Search conversations") }, shape = RoundedCornerShape(28.dp))
-            if (!defaultSms) Surface(color = Color(0xFF171D26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Sms, null, tint = Color(0xFFA8C7FA)); Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) { Text("Make Messages SOM your SMS app", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Required for full SMS control and sending.", color = Color(0xFF9EA8B8), fontSize = 12.sp) }
-                    TextButton(onClick = requestRole) { Text("Set up") }
+            if (!defaultSms) {
+                Surface(color = Color(0xFF171D26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Sms, null, tint = Color(0xFFA8C7FA)); Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) { Text("Make Messages SOM your SMS app", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Required for full SMS control and sending.", color = Color(0xFF9EA8B8), fontSize = 12.sp) }
+                        TextButton(onClick = requestRole) { Text("Set up") }
+                    }
                 }
             }
-            if (filtered.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.MarkUnreadChatAlt, null, tint = Color(0xFF718096), modifier = Modifier.size(52.dp)); Spacer(Modifier.height(10.dp)); Text(if (query.isBlank()) "No conversations yet" else "No results", color = Color.White, fontSize = 18.sp); Text(if (query.isBlank()) "Use the chat icon for Messages SOM users, or compose an SMS.", color = Color(0xFF8993A3)) }
-            } else LazyColumn(contentPadding = PaddingValues(bottom = 92.dp), modifier = Modifier.fillMaxSize()) { items(filtered, key = { it.address }) { c -> ConversationRow(activity, c) { refresh() } } }
+            if (filtered.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.MarkUnreadChatAlt, null, tint = Color(0xFF718096), modifier = Modifier.size(52.dp)); Spacer(Modifier.height(10.dp)); Text(if (query.isBlank()) "No conversations yet" else "No results", color = Color.White, fontSize = 18.sp); Text(if (query.isBlank()) "Use the chat icon for Messages SOM users, or compose an SMS.", color = Color(0xFF8993A3)) }
+                }
+            } else {
+                LazyColumn(contentPadding = PaddingValues(bottom = 92.dp), modifier = Modifier.fillMaxSize()) { items(filtered, key = { it.address }) { c -> ConversationRow(activity, c) { refresh() } } }
+            }
         }
     }
 }
