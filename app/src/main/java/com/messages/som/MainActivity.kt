@@ -148,11 +148,7 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
 
 @Composable
 private fun SetupBanner(defaultSms: Boolean, requestRole: () -> Unit) {
-    if (defaultSms) {
-        Spacer(Modifier.height(0.dp))
-        return
-    }
-    Surface(color = Color(0xFF171D26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+    if (defaultSms) Spacer(Modifier.height(0.dp)) else Surface(color = Color(0xFF171D26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Sms, null, tint = Color(0xFFA8C7FA)); Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) { Text("Make Messages SOM your SMS app", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Required for full SMS control and sending.", color = Color(0xFF9EA8B8), fontSize = 12.sp) }
@@ -178,11 +174,7 @@ private fun ConversationRow(activity: MainActivity, c: Conversation, refresh: ()
 
 @Composable
 private fun UnreadBadge(unread: Int) {
-    if (unread > 0) {
-        Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (unread > 99) "99+" else unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) }
-    } else {
-        Spacer(Modifier.width(0.dp))
-    }
+    if (unread > 0) Spacer(Modifier.width(8.dp)); if (unread > 0) Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (unread > 99) "99+" else unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) }
 }
 
 @Composable
