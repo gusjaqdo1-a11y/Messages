@@ -24,7 +24,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.auth.uid in request.resource.data.participants
         && request.resource.data.participants.size() == 2;
-      allow update: if participant(conversationId);
+      allow update: if participant(conversationId)
+        && request.resource.data.participants == resource.data.participants;
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -33,7 +34,8 @@ service cloud.firestore {
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 4000;
+          && request.resource.data.text.size() <= 4000
+          && request.resource.data.recipientUid in resource.data.participants;
         allow update: if participant(conversationId)
           && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
         allow delete: if false;
