@@ -47,10 +47,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 29 && !isDefaultSmsApp(this)) requestDefaultSmsRole() else requestPermissionsIfNeeded()
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (isDefaultSmsApp(this)) requestPermissionsIfNeeded()
-    }
+    override fun onResume() { super.onResume(); if (isDefaultSmsApp(this)) requestPermissionsIfNeeded() }
 
     private fun requestDefaultSmsRole() {
         if (Build.VERSION.SDK_INT >= 29) {
@@ -61,18 +58,13 @@ class MainActivity : ComponentActivity() {
                 return
             }
         }
-        runCatching { startActivity(Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)) }
-            .onFailure { openDefaultAppsSettings() }
+        runCatching { startActivity(Intent(Telephony.Sms.Intents.ACTION_CHANGE_DEFAULT).putExtra(Telephony.Sms.Intents.EXTRA_PACKAGE_NAME, packageName)) }.onFailure { openDefaultAppsSettings() }
     }
 
     private fun openDefaultAppsSettings() { runCatching { startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) } }
 
     private fun requestPermissionsIfNeeded() {
-        val list = mutableListOf(
-            Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS, Manifest.permission.RECEIVE_SMS,
-            Manifest.permission.READ_CONTACTS, Manifest.permission.RECEIVE_MMS, Manifest.permission.RECEIVE_WAP_PUSH,
-            Manifest.permission.READ_PHONE_STATE
-        )
+        val list = mutableListOf(Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_CONTACTS, Manifest.permission.RECEIVE_MMS, Manifest.permission.RECEIVE_WAP_PUSH, Manifest.permission.READ_PHONE_STATE)
         if (Build.VERSION.SDK_INT >= 33) list += Manifest.permission.POST_NOTIFICATIONS
         val missing = list.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
         if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
@@ -92,10 +84,7 @@ fun containsLink(text: String): Boolean = Regex("https?://\\S+|www\\.\\S+", Rege
 
 fun displayContactName(context: Context, address: String): String {
     if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) return address
-    return runCatching {
-        context.contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME), "${ContactsContract.CommonDataKinds.Phone.NUMBER}=?", arrayOf(address), null)
-            ?.use { if (it.moveToFirst()) it.getString(0) else address } ?: address
-    }.getOrDefault(address)
+    return runCatching { context.contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME), "${ContactsContract.CommonDataKinds.Phone.NUMBER}=?", arrayOf(address), null)?.use { if (it.moveToFirst()) it.getString(0) else address } ?: address }.getOrDefault(address)
 }
 
 fun markThreadRead(context: Context, address: String) {
@@ -129,57 +118,32 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
     var query by remember { mutableStateOf("") }
     var showMenu by remember { mutableStateOf(false) }
     var defaultSms by remember { mutableStateOf(isDefaultSmsApp(activity)) }
-
     fun refresh() { defaultSms = isDefaultSmsApp(activity); conversations = loadConversations(activity) }
-
     val filtered = conversations.filter { query.isBlank() || displayContactName(activity, it.address).contains(query, true) || it.address.contains(query, true) || it.body.contains(query, true) }
-
     LaunchedEffect(Unit) { while (true) { refresh(); kotlinx.coroutines.delay(1500) } }
 
-    Scaffold(
-        containerColor = Color(0xFF090B0F),
-        topBar = {
-            TopAppBar(
-                title = { Text("Messages SOM", color = Color.White, fontWeight = FontWeight.SemiBold) },
-                actions = {
-                    IconButton(onClick = { activity.startActivity(Intent(activity, AppMessagesActivity::class.java)) }) { Icon(Icons.Default.ChatBubbleOutline, "Messages SOM chat", tint = Color.White) }
-                    IconButton(onClick = { activity.startActivity(Intent(activity, ArchiveActivity::class.java)) }) { Icon(Icons.Default.Archive, "Archived", tint = Color.White) }
-                    Box {
-                        IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "More", tint = Color.White) }
-                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                            DropdownMenuItem(text = { Text("Refresh") }, onClick = { refresh(); showMenu = false })
-                            DropdownMenuItem(text = { Text("SMS settings") }, onClick = { runCatching { activity.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }; showMenu = false })
-                        }
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { activity.startActivity(Intent(activity, ComposeActivity::class.java)) }, containerColor = Color(0xFFA8C7FA), contentColor = Color(0xFF0A305F)) { Icon(Icons.Default.Edit, "New message") }
-        }
-    ) { pad ->
+    Scaffold(containerColor = Color(0xFF090B0F), topBar = {
+        TopAppBar(title = { Text("Messages SOM", color = Color.White, fontWeight = FontWeight.SemiBold) }, actions = {
+            IconButton(onClick = { activity.startActivity(Intent(activity, AppMessagesActivity::class.java)) }) { Icon(Icons.Default.ChatBubbleOutline, "Messages SOM chat", tint = Color.White) }
+            IconButton(onClick = { activity.startActivity(Intent(activity, ArchiveActivity::class.java)) }) { Icon(Icons.Default.Archive, "Archived", tint = Color.White) }
+            Box { IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "More", tint = Color.White) }; DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                DropdownMenuItem(text = { Text("Refresh") }, onClick = { refresh(); showMenu = false })
+                DropdownMenuItem(text = { Text("SMS settings") }, onClick = { runCatching { activity.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }; showMenu = false })
+            } }
+        })
+    }, floatingActionButton = { FloatingActionButton(onClick = { activity.startActivity(Intent(activity, ComposeActivity::class.java)) }, containerColor = Color(0xFFA8C7FA), contentColor = Color(0xFF0A305F)) { Icon(Icons.Default.Edit, "New message") } }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad)) {
             OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, placeholder = { Text("Search conversations") }, shape = RoundedCornerShape(28.dp))
-            if (!defaultSms) {
-                Surface(color = Color(0xFF171D26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Sms, null, tint = Color(0xFFA8C7FA]); Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) { Text("Make Messages SOM your SMS app", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Required for full SMS control and sending.", color = Color(0xFF9EA8B8), fontSize = 12.sp) }
-                        TextButton(onClick = requestRole) { Text("Set up") }
-                    }
+            if (!defaultSms) Surface(color = Color(0xFF171D26), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Sms, null, tint = Color(0xFFA8C7FA)); Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) { Text("Make Messages SOM your SMS app", color = Color.White, fontWeight = FontWeight.SemiBold); Text("Required for full SMS control and sending.", color = Color(0xFF9EA8B8), fontSize = 12.sp) }
+                    TextButton(onClick = requestRole) { Text("Set up") }
                 }
             }
-            if (filtered.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.MarkUnreadChatAlt, null, tint = Color(0xFF718096), modifier = Modifier.size(52.dp))
-                        Spacer(Modifier.height(10.dp)); Text(if (query.isBlank()) "No conversations yet" else "No results", color = Color.White, fontSize = 18.sp)
-                        Text(if (query.isBlank()) "Use the chat icon for Messages SOM users, or compose an SMS." else "Try another search.", color = Color(0xFF8993A3))
-                    }
-                }
-            } else {
-                LazyColumn(contentPadding = PaddingValues(bottom = 92.dp), modifier = Modifier.fillMaxSize()) { items(filtered, key = { it.address }) { c -> ConversationRow(activity, c) { refresh() } } }
-            }
+            if (filtered.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.MarkUnreadChatAlt, null, tint = Color(0xFF718096), modifier = Modifier.size(52.dp)); Spacer(Modifier.height(10.dp)); Text(if (query.isBlank()) "No conversations yet" else "No results", color = Color.White, fontSize = 18.sp); Text(if (query.isBlank()) "Use the chat icon for Messages SOM users, or compose an SMS.", color = Color(0xFF8993A3)) }
+            } else LazyColumn(contentPadding = PaddingValues(bottom = 92.dp), modifier = Modifier.fillMaxSize()) { items(filtered, key = { it.address }) { c -> ConversationRow(activity, c) { refresh() } } }
         }
     }
 }
@@ -189,16 +153,9 @@ private fun ConversationRow(activity: MainActivity, c: Conversation, refresh: ()
     val name = displayContactName(activity, c.address)
     Row(Modifier.fillMaxWidth().clickable { activity.startActivity(Intent(activity, ThreadActivity::class.java).putExtra("address", c.address)) }.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(52.dp).clip(CircleShape).background(Color(0xFF252B35)), contentAlignment = Alignment.Center) { Text(name.take(1).uppercase(), color = Color(0xFFA8C7FA), fontSize = 20.sp, fontWeight = FontWeight.Bold) }
-        Spacer(Modifier.width(13.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(name, color = Color.White, fontSize = 16.sp, fontWeight = if (c.unread > 0) FontWeight.Bold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(c.date)), color = Color(0xFF8F98A8), fontSize = 11.sp)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(c.body, color = if (c.unread > 0) Color(0xFFE2E6ED) else Color(0xFF929BAA), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                if (c.unread > 0) { Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (c.unread > 99) "99+" else c.unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) } }
-            }
+        Spacer(Modifier.width(13.dp)); Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) { Text(name, color = Color.White, fontSize = 16.sp, fontWeight = if (c.unread > 0) FontWeight.Bold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(c.date)), color = Color(0xFF8F98A8), fontSize = 11.sp) }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text(c.body, color = if (c.unread > 0) Color(0xFFE2E6ED) else Color(0xFF929BAA), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); if (c.unread > 0) { Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (c.unread > 99) "99+" else c.unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) } } }
             if (containsLink(c.body)) Text("LINK", color = Color(0xFFA8C7FA), fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
     }
