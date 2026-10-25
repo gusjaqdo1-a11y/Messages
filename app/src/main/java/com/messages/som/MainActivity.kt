@@ -137,7 +137,7 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
             SetupBanner(defaultSms, requestRole)
             if (filtered.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.MarkUnreadChatAlt, null, tint = Color(0xFF718096), modifier = Modifier.size(52.dp)); Spacer(Modifier.height(10.dp)); Text(if (query.isBlank()) "No conversations yet" else "No results", color = Color.White, fontSize = 18.sp); Text(if (query.isBlank()) "Use the chat icon for Messages SOM users, or compose an SMS.", color = Color(0xFF8993A3)) }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.MarkUnreadChatAlt, null, tint = Color(0xFF718096), modifier = Modifier.size(52.dp)); Spacer(Modifier.height(10.dp)); Text(if (query.isBlank()) "No conversations yet" else "No results", color = Color.White, fontSize = 18.sp); Text(if (query.isBlank()) "Use the chat icon for Messages SOM users, or compose an SMS." else "Try another search.", color = Color(0xFF8993A3)) }
                 }
             } else {
                 LazyColumn(contentPadding = PaddingValues(bottom = 92.dp), modifier = Modifier.fillMaxSize()) { items(filtered, key = { it.address }) { c -> ConversationRow(activity, c) { refresh() } } }
@@ -174,7 +174,11 @@ private fun ConversationRow(activity: MainActivity, c: Conversation, refresh: ()
 
 @Composable
 private fun UnreadBadge(unread: Int) {
-    if (unread > 0) Spacer(Modifier.width(8.dp)); if (unread > 0) Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (unread > 99) "99+" else unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) }
+    if (unread > 0) {
+        Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (unread > 99) "99+" else unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) }
+    } else {
+        Spacer(Modifier.width(0.dp))
+    }
 }
 
 @Composable
