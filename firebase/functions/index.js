@@ -22,7 +22,7 @@ exports.notifyNewAppMessage = onDocumentCreated('appConversations/{conversationI
         senderUid: String(message.senderUid), senderId: String(message.senderId || ''), senderName: String(message.senderName || ''),
         allowReplies: String(message.allowReplies !== false)
       },
-      android: { priority: 'high', notification: { channelId: 'chat', clickAction: 'FLUTTER_NOTIFICATION_CLICK' } }
+      android: { priority: 'high', notification: { channelId: 'chat' } }
     });
     await event.data.ref.update({ deliveredAt: Date.now() });
   } catch (error) {
