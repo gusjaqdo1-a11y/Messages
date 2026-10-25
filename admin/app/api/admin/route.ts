@@ -2,81 +2,8 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import crypto from 'node:crypto';
 import { defaults, id, readData, writeData } from '../../../lib/store';
-
-async function authorized() {
-  const c = (await cookies()).get('messages_admin')?.value;
-  const secret = process.env.SESSION_SECRET;
-  if (!c || !secret) return false;
-  const [exp, sig] = c.split('.');
-  if (!exp || !sig || !/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
-  const good = crypto.createHmac('sha256', secret).update(exp).digest('hex');
-  const a = Buffer.from(good), b = Buffer.from(sig);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
-function safe(data: any) {
-  return {
-    ...data,
-    providers: data.providers.map((p: any) => ({ ...p, apiKey: undefined, apiSecret: undefined, secretConfigured: Boolean(p.apiKey || p.apiSecret), health: p.health || 'unknown' })),
-    apiKeys: data.apiKeys.map((k: any) => ({ ...k, token: undefined, tokenConfigured: Boolean(k.token) })),
-  };
-}
-
-export async function GET() {
-  if (!(await authorized())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  return NextResponse.json({ ok: true, data: safe(await readData()) });
-}
-
-export async function POST(req: Request) {
-  if (!(await authorized())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const body = await req.json().catch(() => ({}));
-  const data = await readData();
-  const now = new Date().toISOString();
-  const action = body.action;
-  let result: any = null;
-
-  if (action === 'seed') {
-    await writeData(data);
-  } else if (action === 'save') {
-    const collection = body.collection;
-    if (!Array.isArray((data as any)[collection])) return NextResponse.json({ error: 'Invalid collection' }, { status: 400 });
-    const item = { ...(body.item || {}), id: body.item?.id || id(collection.slice(0, 3)), updatedAt: now, createdAt: body.item?.createdAt || now };
-    const arr = (data as any)[collection] as any[];
-    const index = arr.findIndex(x => x.id === item.id);
-    if (index >= 0) arr[index] = { ...arr[index], ...item };
-    else arr.unshift(item);
-    result = item;
-  } else if (action === 'delete') {
-    const collection = body.collection;
-    if (!Array.isArray((data as any)[collection])) return NextResponse.json({ error: 'Invalid collection' }, { status: 400 });
-    (data as any)[collection] = (data as any)[collection].filter((x: any) => x.id !== body.id);
-    result = { id: body.id };
-  } else if (action === 'toggle') {
-    const collection = body.collection;
-    const item = (data as any)[collection]?.find((x: any) => x.id === body.id);
-    if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    item[body.field] = !Boolean(item[body.field]); item.updatedAt = now; result = item;
-  } else if (action === 'generateApiKey') {
-    const item = { id: id('key'), name: body.name || 'API key', scope: body.scope || 'messages:send', enabled: true, token: `msom_${crypto.randomBytes(32).toString('base64url')}`, createdAt: now, updatedAt: now };
-    data.apiKeys.unshift(item); result = { ...item, token: item.token };
-    data.audit.unshift({ id: id('audit'), action: 'api_key_created', details: item.name, createdAt: now });
-  } else if (action === 'retry') {
-    const item = data.messages.find((x: any) => x.id === body.id);
-    if (!item) return NextResponse.json({ error: 'Message not found' }, { status: 404 });
-    item.status = 'queued'; item.retryCount = Number(item.retryCount || 0) + 1; item.updatedAt = now;
-    data.audit.unshift({ id: id('audit'), action: 'message_retry', details: item.id, createdAt: now }); result = item;
-  } else if (action === 'audit') {
-    data.audit.unshift({ id: id('audit'), action: body.name || 'admin_action', details: body.details || '', createdAt: now });
-    data.audit = data.audit.slice(0, 500);
-  } else if (action === 'settings') {
-    data.settings = { ...data.settings, ...(body.settings || {}) };
-    result = data.settings;
-  } else if (action === 'reset') {
-    Object.assign(data, structuredClone(defaults));
-  } else {
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
-  }
-
-  await writeData(data);
-  return NextResponse.json({ ok: true, result, data: safe(data) });
-}
+async function authorized(){const c=(await cookies()).get('messages_admin')?.value;const secret=process.env.SESSION_SECRET;if(!c||!secret)return false;const[exp,sig]=c.split('.');if(!exp||!sig||!/^[0-9]+$/.test(exp)||Number(exp)<Date.now())return false;const good=crypto.createHmac('sha256',secret).update(exp).digest('hex');const a=Buffer.from(good),b=Buffer.from(sig);return a.length===b.length&&crypto.timingSafeEqual(a,b)}
+function safe(data:any){return{...data,providers:data.providers.map((p:any)=>({...p,apiKey:undefined,apiSecret:undefined,secretConfigured:Boolean(p.apiKey||p.apiSecret),health:p.health||'unknown'})),apiKeys:data.apiKeys.map((k:any)=>({...k,token:undefined,tokenConfigured:Boolean(k.token)}))}}
+export async function GET(){if(!(await authorized()))return NextResponse.json({error:'Unauthorized'},{status:401});return NextResponse.json({ok:true,data:safe(await readData())})}
+export async function POST(req:Request){if(!(await authorized()))return NextResponse.json({error:'Unauthorized'},{status:401});const body=await req.json().catch(()=>({}));const data=await readData();const now=new Date().toISOString();const action=body.action;let result:any=null;
+if(action==='seed'){await writeData(data)}else if(action==='save'){const collection=body.collection;if(!Array.isArray((data as any)[collection]))return NextResponse.json({error:'Invalid collection'},{status:400});const previous=(data as any)[collection].find((x:any)=>x.id===body.item?.id);const incoming={...(body.item||{})};if(collection==='providers'&&previous){if(!incoming.apiKey)incoming.apiKey=previous.apiKey;if(!incoming.apiSecret)incoming.apiSecret=previous.apiSecret}const item={...incoming,id:body.item?.id||id(collection.slice(0,3)),updatedAt:now,createdAt:body.item?.createdAt||now};const arr=(data as any)[collection] as any[];const index=arr.findIndex(x=>x.id===item.id);if(index>=0)arr[index]={...arr[index],...item};else arr.unshift(item);result=item}else if(action==='delete'){const collection=body.collection;if(!Array.isArray((data as any)[collection]))return NextResponse.json({error:'Invalid collection'},{status:400});(data as any)[collection]=(data as any)[collection].filter((x:any)=>x.id!==body.id);result={id:body.id}}else if(action==='toggle'){const collection=body.collection;const item=(data as any)[collection]?.find((x:any)=>x.id===body.id);if(!item)return NextResponse.json({error:'Not found'},{status:404});item[body.field]=!Boolean(item[body.field]);item.updatedAt=now;result=item}else if(action==='generateApiKey'){const item={id:id('key'),name:body.name||'API key',scope:body.scope||'messages:send',enabled:true,token:`msom_${crypto.randomBytes(32).toString('base64url')}`,createdAt:now,updatedAt:now};data.apiKeys.unshift(item);result={...item,token:item.token};data.audit.unshift({id:id('audit'),action:'api_key_created',details:item.name,createdAt:now})}else if(action==='retry'){const item=data.messages.find((x:any)=>x.id===body.id);if(!item)return NextResponse.json({error:'Message not found'},{status:404});item.status='queued';item.retryCount=Number(item.retryCount||0)+1;item.updatedAt=now;data.audit.unshift({id:id('audit'),action:'message_retry',details:item.id,createdAt:now});result=item}else if(action==='audit'){data.audit.unshift({id:id('audit'),action:body.name||'admin_action',details:body.details||'',createdAt:now});data.audit=data.audit.slice(0,500)}else if(action==='settings'){data.settings={...data.settings,...(body.settings||{})};result=data.settings}else if(action==='reset'){Object.assign(data,structuredClone(defaults))}else{return NextResponse.json({error:'Unknown action'},{status:400})}await writeData(data);return NextResponse.json({ok:true,result,data:safe(data)})}
