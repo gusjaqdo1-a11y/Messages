@@ -47,11 +47,12 @@ private fun AppMessagesScreen(activity: AppMessagesActivity) {
     var error by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(true) }
     var search by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<AppMessagingRepository.AppProfile>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         repo.ensureSignedIn { r ->
-            r.onSuccess { profile = it; loading = false }
+            r.onSuccess { profile = it; phone = it.phoneNumber; loading = false }
                 .onFailure { error = it.message ?: "Firebase setup is required"; loading = false }
         }
     }
@@ -67,7 +68,7 @@ private fun AppMessagesScreen(activity: AppMessagesActivity) {
             TopAppBar(
                 title = { Column {
                     Text("Messages SOM", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    Text("App-to-app messaging", color = Color(0xFF8E98A8), fontSize = 11.sp)
+                    Text("Messaging network", color = Color(0xFF8E98A8), fontSize = 11.sp)
                 } },
                 navigationIcon = { IconButton({ activity.finish() }) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) } }
             )
@@ -80,23 +81,34 @@ private fun AppMessagesScreen(activity: AppMessagesActivity) {
                 profile?.let { me ->
                     Surface(color = Color(0xFF11161D), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                         Column(Modifier.padding(16.dp)) {
-                            Text("Your Messages SOM ID", color = Color(0xFF8E98A8), fontSize = 12.sp)
+                            Text("Your Messages SOM identity", color = Color(0xFF8E98A8), fontSize = 12.sp)
                             Text(me.messagesId, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                             Text(me.displayName, color = Color(0xFF9EA8B8), fontSize = 13.sp)
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedTextField(value = phone, onValueChange = { phone = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Your phone number") }, placeholder = { Text("+2519XXXXXXXX") }, shape = RoundedCornerShape(14.dp))
+                            Spacer(Modifier.height(7.dp))
+                            Button(onClick = {
+                                repo.updatePhoneNumber(phone) { r ->
+                                    r.onSuccess { profile = profile?.copy(phoneNumber = phone.trim().replace(Regex("[\\s()-]"), "")); error = "Number linked successfully" }
+                                        .onFailure { error = it.message ?: "Unable to link number" }
+                                }
+                            }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text("Save number") }
                         }
                     }
                 }
                 Spacer(Modifier.height(14.dp))
-                Text("Start a conversation", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text("Message a Messages SOM user", color = Color.White, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(7.dp))
                 OutlinedTextField(
                     value = search, onValueChange = { value -> search = value; results = emptyList() },
                     modifier = Modifier.fillMaxWidth(), singleLine = true,
                     leadingIcon = { Icon(Icons.Default.Search, null) },
-                    placeholder = { Text("Enter Messages SOM ID") },
+                    placeholder = { Text("Phone number or MSOM ID") },
                     trailingIcon = {
                         IconButton(enabled = search.trim().length >= 5, onClick = {
-                            repo.searchByMessagesId(search) { r -> r.onSuccess { results = it }.onFailure { error = it.message ?: "Search failed" } }
+                            val value = search.trim()
+                            val callback: (Result<List<AppMessagingRepository.AppProfile>>) -> Unit = { r -> r.onSuccess { results = it; if (it.isEmpty()) error = "No Messages SOM user found" }.onFailure { error = it.message ?: "Search failed" } }
+                            if (value.uppercase(Locale.US).startsWith("MSOM-")) repo.searchByMessagesId(value, callback) else repo.searchByPhone(value, callback)
                         }) { Icon(Icons.Default.PersonAdd, "Find user") }
                     }, shape = RoundedCornerShape(18.dp)
                 )
@@ -106,11 +118,11 @@ private fun AppMessagesScreen(activity: AppMessagesActivity) {
                 }
                 if (error.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
-                    Text(error, color = Color(0xFFFFA8A0), fontSize = 12.sp)
+                    Text(error, color = if (error.contains("success", true)) Color(0xFF8FE3B0) else Color(0xFFFFA8A0), fontSize = 12.sp)
                 }
                 Spacer(Modifier.height(18.dp))
-                Text("Private app messaging", color = Color.White, fontWeight = FontWeight.SemiBold)
-                Text("Messages SOM users can message each other without carrier SMS, phone-number routing, or an international SMS provider.", color = Color(0xFF8993A3), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                Text("App-to-app messaging", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text("Messages SOM numbers can be used by connected apps and Sender IDs. Messages stay inside the Messages SOM network and do not use carrier SMS.", color = Color(0xFF8993A3), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
             }
         }
     }
@@ -125,7 +137,7 @@ private fun UserRow(user: AppMessagingRepository.AppProfile, onClick: () -> Unit
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Text(user.displayName, color = Color.White, fontWeight = FontWeight.Medium)
-            Text(user.messagesId, color = Color(0xFF8F99A9), fontSize = 12.sp)
+            Text(user.phoneNumber.ifBlank { user.messagesId }, color = Color(0xFF8F99A9), fontSize = 12.sp)
         }
     }
 }
@@ -146,15 +158,13 @@ private fun AppChatScreen(repo: AppMessagingRepository, user: AppMessagingReposi
         onDispose { registration?.remove() }
     }
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
-    }
+    LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex) }
 
     Scaffold(
         containerColor = Color(0xFF090B0F),
         topBar = {
             TopAppBar(
-                title = { Column { Text(user.displayName, color = Color.White, fontSize = 17.sp); Text(user.messagesId, color = Color(0xFF8E98A8), fontSize = 11.sp) } },
+                title = { Column { Text(user.displayName, color = Color.White, fontSize = 17.sp); Text(user.phoneNumber.ifBlank { user.messagesId }, color = Color(0xFF8E98A8), fontSize = 11.sp) } },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back", tint = Color.White) } }
             )
         },
