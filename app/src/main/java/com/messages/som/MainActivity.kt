@@ -142,6 +142,8 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
                         TextButton(onClick = requestRole) { Text("Set up") }
                     }
                 }
+            } else {
+                Spacer(Modifier.height(0.dp))
             }
             if (filtered.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -161,8 +163,15 @@ private fun ConversationRow(activity: MainActivity, c: Conversation, refresh: ()
         Box(Modifier.size(52.dp).clip(CircleShape).background(Color(0xFF252B35)), contentAlignment = Alignment.Center) { Text(name.take(1).uppercase(), color = Color(0xFFA8C7FA), fontSize = 20.sp, fontWeight = FontWeight.Bold) }
         Spacer(Modifier.width(13.dp)); Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) { Text(name, color = Color.White, fontSize = 16.sp, fontWeight = if (c.unread > 0) FontWeight.Bold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); Text(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(c.date)), color = Color(0xFF8F98A8), fontSize = 11.sp) }
-            Row(verticalAlignment = Alignment.CenterVertically) { Text(c.body, color = if (c.unread > 0) Color(0xFFE2E6ED) else Color(0xFF929BAA), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)); if (c.unread > 0) { Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (c.unread > 99) "99+" else c.unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) } } }
-            if (containsLink(c.body)) Text("LINK", color = Color(0xFFA8C7FA), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(c.body, color = if (c.unread > 0) Color(0xFFE2E6ED) else Color(0xFF929BAA), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                if (c.unread > 0) {
+                    Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (c.unread > 99) "99+" else c.unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) }
+                } else {
+                    Spacer(Modifier.width(0.dp))
+                }
+            }
+            if (containsLink(c.body)) Text("LINK", color = Color(0xFFA8C7FA), fontSize = 9.sp, fontWeight = FontWeight.Bold) else Spacer(Modifier.height(0.dp))
         }
     }
 }
