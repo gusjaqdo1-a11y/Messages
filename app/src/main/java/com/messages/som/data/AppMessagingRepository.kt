@@ -15,7 +15,7 @@ class AppMessagingRepository(
 ) {
     data class AppProfile(
         val uid: String = "", val messagesId: String = "", val displayName: String = "",
-        val photoUrl: String = "", val fcmToken: String = "", val enabled: Boolean = true,
+        val phoneNumber: String = "", val photoUrl: String = "", val fcmToken: String = "", val enabled: Boolean = true,
         val createdAt: Long = 0L, val updatedAt: Long = 0L
     )
 
@@ -45,8 +45,23 @@ class AppMessagingRepository(
             }
             val id = "MSOM-" + UUID.randomUUID().toString().replace("-", "").take(8).uppercase(Locale.US)
             val now = System.currentTimeMillis()
-            val profile = AppProfile(uid, id, currentName.ifBlank { "Messages SOM user" }, "", "", true, now, now)
+            val profile = AppProfile(uid, id, currentName.ifBlank { "Messages SOM user" }, "", "", "", true, now, now)
             ref.set(profile).addOnSuccessListener { onResult(Result.success(profile)) }.addOnFailureListener { onResult(Result.failure(it)) }
+        }.addOnFailureListener { onResult(Result.failure(it)) }
+    }
+
+    fun updatePhoneNumber(phone: String, onResult: (Result<Unit>) -> Unit) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) { onResult(Result.failure(IllegalStateException("Not signed in"))); return }
+        val value = phone.trim().replace(Regex("[\\s()-]"), "")
+        if (!Regex("^\\+?[1-9]\\d{6,14}$").matches(value)) { onResult(Result.failure(IllegalArgumentException("Use an international number, e.g. +2519XXXXXXXX"))); return }
+        db.collection("profiles").whereEqualTo("phoneNumber", value).limit(1).get().addOnSuccessListener { existing ->
+            if (!existing.isEmpty && existing.documents.first().id != uid) {
+                onResult(Result.failure(IllegalStateException("This number is already linked to Messages SOM")))
+                return@addOnSuccessListener
+            }
+            db.collection("profiles").document(uid).update("phoneNumber", value, "updatedAt", System.currentTimeMillis())
+                .addOnSuccessListener { onResult(Result.success(Unit)) }.addOnFailureListener { onResult(Result.failure(it)) }
         }.addOnFailureListener { onResult(Result.failure(it)) }
     }
 
@@ -76,6 +91,14 @@ class AppMessagingRepository(
         val q = value.trim().uppercase(Locale.US)
         if (q.length < 5) { onResult(Result.success(emptyList())); return }
         db.collection("profiles").whereEqualTo("messagesId", q).limit(10).get()
+            .addOnSuccessListener { onResult(Result.success(it.documents.mapNotNull { d -> d.toObject(AppProfile::class.java) })) }
+            .addOnFailureListener { onResult(Result.failure(it)) }
+    }
+
+    fun searchByPhone(value: String, onResult: (Result<List<AppProfile>>) -> Unit) {
+        val q = value.trim().replace(Regex("[\\s()-]"), "")
+        if (q.length < 7) { onResult(Result.success(emptyList())); return }
+        db.collection("profiles").whereEqualTo("phoneNumber", q).limit(10).get()
             .addOnSuccessListener { onResult(Result.success(it.documents.mapNotNull { d -> d.toObject(AppProfile::class.java) })) }
             .addOnFailureListener { onResult(Result.failure(it)) }
     }
