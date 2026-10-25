@@ -55,6 +55,7 @@
         <activity android:name=".ComposeActivity" android:exported="false" />
         <activity android:name=".ThreadActivity" android:exported="false" />
         <activity android:name=".ArchiveActivity" android:exported="false" />
+        <activity android:name=".AppMessagesActivity" android:exported="false" />
 
         <receiver
             android:name=".SmsReceiver"
