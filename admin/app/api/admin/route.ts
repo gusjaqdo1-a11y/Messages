@@ -17,7 +17,7 @@ async function authorized() {
 function safe(data: any) {
   return {
     ...data,
-    providers: data.providers.map((p: any) => ({ ...p, apiKey: undefined, apiSecret: undefined, secretConfigured: Boolean(p.apiKey || p.apiSecret) })),
+    providers: data.providers.map((p: any) => ({ ...p, apiKey: undefined, apiSecret: undefined, secretConfigured: Boolean(p.apiKey || p.apiSecret), health: p.health || 'unknown' })),
     apiKeys: data.apiKeys.map((k: any) => ({ ...k, token: undefined, tokenConfigured: Boolean(k.token) })),
   };
 }
@@ -56,6 +56,15 @@ export async function POST(req: Request) {
     const item = (data as any)[collection]?.find((x: any) => x.id === body.id);
     if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     item[body.field] = !Boolean(item[body.field]); item.updatedAt = now; result = item;
+  } else if (action === 'generateApiKey') {
+    const item = { id: id('key'), name: body.name || 'API key', scope: body.scope || 'messages:send', enabled: true, token: `msom_${crypto.randomBytes(32).toString('base64url')}`, createdAt: now, updatedAt: now };
+    data.apiKeys.unshift(item); result = { ...item, token: item.token };
+    data.audit.unshift({ id: id('audit'), action: 'api_key_created', details: item.name, createdAt: now });
+  } else if (action === 'retry') {
+    const item = data.messages.find((x: any) => x.id === body.id);
+    if (!item) return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    item.status = 'queued'; item.retryCount = Number(item.retryCount || 0) + 1; item.updatedAt = now;
+    data.audit.unshift({ id: id('audit'), action: 'message_retry', details: item.id, createdAt: now }); result = item;
   } else if (action === 'audit') {
     data.audit.unshift({ id: id('audit'), action: body.name || 'admin_action', details: body.details || '', createdAt: now });
     data.audit = data.audit.slice(0, 500);
