@@ -7,6 +7,7 @@ const db = getFirestore();
 exports.notifyNewAppMessage = onDocumentCreated('appConversations/{conversationId}/messages/{messageId}', async (event) => {
   const message = event.data?.data();
   if (!message || !message.recipientUid || !message.senderUid || message.senderUid === message.recipientUid) return;
+  if (message.source === 'api') return;
   const profile = await db.collection('profiles').doc(message.recipientUid).get();
   if (!profile.exists) return;
   const token = profile.data()?.fcmToken;
@@ -24,6 +25,7 @@ exports.notifyNewAppMessage = onDocumentCreated('appConversations/{conversationI
       },
       android: { priority: 'high', notification: { channelId: 'chat', clickAction: 'FLUTTER_NOTIFICATION_CLICK' } }
     });
+    await event.data.ref.update({ deliveredAt: Date.now() });
   } catch (error) {
     const code = error?.code || '';
     if (code.includes('registration-token-not-registered') || code.includes('invalid-registration-token')) await profile.ref.update({ fcmToken: '' });
