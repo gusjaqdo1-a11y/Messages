@@ -35,7 +35,7 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 4000
-          && request.resource.data.recipientUid in resource.data.participants;
+          && request.resource.data.recipientUid in get(/databases/$(database)/documents/appConversations/$(conversationId)).data.participants;
         allow update: if participant(conversationId)
           && (resource.data.senderUid == request.auth.uid || resource.data.recipientUid == request.auth.uid);
         allow delete: if false;
