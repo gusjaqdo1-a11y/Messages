@@ -8,7 +8,6 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Telephony
-import android.telephony.SmsManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -47,6 +46,7 @@ class ThreadActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val address = intent.getStringExtra("address") ?: ""
         val initialUnread = unreadCount(this, address)
+        markThreadRead(this, address)
         setContent { MessagesSomTheme { ThreadScreen(this, address, initialUnread) } }
     }
 }
@@ -77,17 +77,6 @@ private fun deleteThreadConversation(context: Context, address: String) {
     runCatching { context.contentResolver.delete(Telephony.Sms.CONTENT_URI, "address=?", arrayOf(address)) }
 }
 
-private fun sendSms(context: Context, address: String, body: String, onDone: (Boolean) -> Unit) {
-    if (ContextCompat.checkSelfPermission(context, Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) { onDone(false); return }
-    runCatching {
-        val manager = SmsManager.getDefault()
-        val parts = manager.divideMessage(body)
-        if (parts.size == 1) manager.sendTextMessage(address, null, body, null, null) else manager.sendMultipartTextMessage(address, null, parts, null, null)
-        context.contentResolver.insert(Telephony.Sms.Sent.CONTENT_URI, ContentValues().apply { put(Telephony.Sms.ADDRESS, address); put(Telephony.Sms.BODY, body); put(Telephony.Sms.DATE, System.currentTimeMillis()); put(Telephony.Sms.READ, 1); put(Telephony.Sms.TYPE, Telephony.Sms.MESSAGE_TYPE_SENT) })
-        onDone(true)
-    }.onFailure { onDone(false) }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ThreadScreen(activity: ThreadActivity, address: String, initialUnread: Int) {
@@ -98,6 +87,7 @@ private fun ThreadScreen(activity: ThreadActivity, address: String, initialUnrea
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    var sending by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val clipboard = LocalClipboardManager.current
     val canReply = isWritableDestination(address)
@@ -123,7 +113,18 @@ private fun ThreadScreen(activity: ThreadActivity, address: String, initialUnrea
         bottomBar = {
             if (canReply) Row(Modifier.fillMaxWidth().background(Color(0xFF0F1217)).padding(10.dp), verticalAlignment = Alignment.Bottom) {
                 OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.weight(1f), placeholder = { Text("Text message") }, maxLines = 5, shape = RoundedCornerShape(25.dp))
-                Spacer(Modifier.width(7.dp)); FilledIconButton(onClick = { val outgoing = text.trim(); if (outgoing.isNotBlank()) sendSms(activity, address, outgoing) { ok -> if (ok) { text = ""; messages = loadThread(activity, address); error = "" } else error = "Message could not be sent" } }, enabled = text.isNotBlank(), modifier = Modifier.size(52.dp)) { Icon(Icons.Default.Send, "Send") }
+                Spacer(Modifier.width(7.dp)); FilledIconButton(onClick = {
+                    val outgoing = text.trim()
+                    if (outgoing.isNotBlank() && !sending) {
+                        sending = true
+                        val result = SmsDispatch.send(activity, address, outgoing)
+                        sending = false
+                        if (result.isSuccess) { text = ""; messages = loadThread(activity, address); error = "" }
+                        else error = result.exceptionOrNull()?.message ?: "Message could not be sent"
+                    }
+                }, enabled = text.isNotBlank() && !sending, modifier = Modifier.size(52.dp)) {
+                    if (sending) CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp) else Icon(Icons.Default.Send, "Send")
+                }
             } else Surface(color = Color(0xFF171B22)) { Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Block, null, tint = Color(0xFFFFC978)); Spacer(Modifier.width(10.dp)); Text("This Sender ID does not accept replies.", color = Color(0xFFD0BFA7)) } }
         }
     ) { p ->
