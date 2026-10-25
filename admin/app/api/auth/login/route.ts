@@ -6,7 +6,10 @@ export async function POST(req: Request) {
   const expected = process.env.ADMIN_PASSWORD;
   const secret = process.env.SESSION_SECRET;
   if (!expected || !secret) return NextResponse.json({error:'Admin authentication is not configured'}, {status:500});
-  if (typeof password !== 'string' || password.length === 0 || !crypto.timingSafeEqual(Buffer.from(password), Buffer.from(expected))) return NextResponse.json({error:'Invalid password'}, {status:401});
+  const supplied = typeof password === 'string' ? password : '';
+  const a = crypto.createHash('sha256').update(supplied).digest();
+  const b = crypto.createHash('sha256').update(expected).digest();
+  if (!crypto.timingSafeEqual(a,b)) return NextResponse.json({error:'Invalid password'}, {status:401});
   const exp = Date.now() + 1000*60*60*24*7;
   const payload = String(exp);
   const sig = crypto.createHmac('sha256', secret).update(payload).digest('hex');
