@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "980627770207",
+    "project_id": "messages-som-a6ddf",
+    "storage_bucket": "messages-som-a6ddf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980627770207:android:5b72365622be3809a244ea",
+        "android_client_info": {
+          "package_name": "com.messages.som"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAyxqHpexKtxr_2CigUshQLz6QcDCC257k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
