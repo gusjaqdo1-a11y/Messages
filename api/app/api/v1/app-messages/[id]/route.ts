@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server';
-import {authorizedKey,hasScope,readData} from '../../../../../../lib/sms';
-import {firebaseDb} from '../../../../../../lib/firebase-admin';
+import {authorizedKey,hasScope,readData} from '../../../../../lib/sms';
+import {firebaseDb} from '../../../../../lib/firebase-admin';
 
 export async function GET(req:Request,{params}:{params:Promise<{id:string}>}){
   try{
