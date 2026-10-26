@@ -1,0 +1,57 @@
+name: phone-auto-fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply phone auto-link patch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('app/src/main/java/com/messages/som/MainActivity.kt')
+          s = p.read_text()
+          if 'PhoneNumberAutoLinker' not in s:
+              s = s.replace('import com.messages.som.data.AppMessagingRepository\n', 'import com.messages.som.data.AppMessagingRepository\nimport com.messages.som.data.PhoneNumberAutoLinker\n')
+              s = s.replace('override fun onResume() { super.onResume(); if (isDefaultSmsApp(this)) requestPermissionsIfNeeded() }', 'override fun onResume() { super.onResume(); if (isDefaultSmsApp(this)) { requestPermissionsIfNeeded(); syncMessagesSomProfile() } }\n\n    private fun syncMessagesSomProfile() {\n        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED) return\n        AppMessagingRepository().ensureSignedIn { result -> result.onSuccess { PhoneNumberAutoLinker.sync(this, AppMessagingRepository()) } }\n    }')
+              s = s.replace('if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())', 'if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray()) else syncMessagesSomProfile()')
+              p.write_text(s)
+
+          p = Path('app/src/main/java/com/messages/som/AppMessagesActivity.kt')
+          s = p.read_text()
+          if 'PhoneNumberAutoLinker.sync' not in s:
+              s = s.replace('import com.messages.som.data.DevicePhoneNumber\n', 'import com.messages.som.data.DevicePhoneNumber\nimport com.messages.som.data.PhoneNumberAutoLinker\n') if 'DevicePhoneNumber' in s else s.replace('import com.messages.som.data.AppMessagingRepository\n', 'import com.messages.som.data.AppMessagingRepository\nimport com.messages.som.data.DevicePhoneNumber\nimport com.messages.som.data.PhoneNumberAutoLinker\n')
+              old = 'r.onSuccess {\n                profile = it; loading = false'
+              new = 'r.onSuccess {\n                profile = it; loading = false\n                if (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED) {\n                    PhoneNumberAutoLinker.sync(activity, repo)\n                    if (it.phoneNumber.isBlank()) {\n                        DevicePhoneNumber.read(activity)?.let { detected -> profile = it.copy(phoneNumber = detected) }\n                    }\n                }'
+              if old in s:
+                  s = s.replace(old, new)
+              else:
+                  s = s.replace('r.onSuccess {\n                profile = it; loading = false\n', 'r.onSuccess {\n                profile = it; loading = false\n                if (ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED) PhoneNumberAutoLinker.sync(activity, repo)\n')
+              p.write_text(s)
+
+          Path('.phone-auto-fix-done').write_text('done\n')
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/messages/som/MainActivity.kt app/src/main/java/com/messages/som/AppMessagesActivity.kt .phone-auto-fix-done
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix(android): auto-link detected device number'
+          git push origin main
+      - name: Remove one-time workflow
+        if: success()
+        run: |
+          git rm .github/workflows/phone-auto-fix.yml
+          git commit -m 'chore: remove one-time phone auto-fix workflow'
+          git push origin main
