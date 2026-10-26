@@ -32,9 +32,8 @@ export async function POST(req:Request){
     try{
       await firebaseMessaging().send({
         token:fcmToken,
-        notification:{title:externalSenderName,body:text.slice(0,180)},
-        data:{type:'app_message',conversationId:conversation,messageId:messageRef.id,senderUid,senderId:externalSenderId,senderName:externalSenderName,allowReplies:String(allowReplies)},
-        android:{priority:'high',notification:{channelId:'chat'}}
+        data:{type:'app_message',title:externalSenderName,body:text.slice(0,180),conversationId:conversation,messageId:messageRef.id,senderUid,senderId:externalSenderId,senderName:externalSenderName,allowReplies:String(allowReplies)},
+        android:{priority:'high'}
       });
       await messageRef.update({deliveredAt:Date.now()});
       return NextResponse.json({ok:true,data:{id:messageRef.id,status:'delivered',recipient:recipient.messagesId||null,sender_id:externalSenderId,allow_replies:allowReplies}});
