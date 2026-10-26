@@ -1,6 +1,6 @@
 import {NextResponse} from 'next/server';
 import {authorizedKey,hasScope,readData,countryFromNumber,normalizeNumber} from '../../../../../lib/sms';
-import {firebaseDb} from '../../../../../lib/firebase-admin';
+import {firebaseDb,firebaseMessaging} from '../../../../../lib/firebase-admin';
 
 export async function POST(req:Request){
   try{
@@ -23,11 +23,26 @@ export async function POST(req:Request){
     if(users.size>1)return NextResponse.json({ok:false,error:'Recipient number is linked to multiple Messages SOM accounts'},{status:409});
     const recipientDoc=users.docs[0];const recipient=recipientDoc.data();
     if(recipient.enabled===false)return NextResponse.json({ok:false,error:'Recipient Messages SOM account is disabled'},{status:403});
+    const fcmToken=String(recipient.fcmToken||'').trim();
+    if(!fcmToken)return NextResponse.json({ok:false,error:'Recipient has no active Messages SOM notification token'},{status:503});
     const senderUid=`api:${apiKey?.id||'internal'}`;const recipientUid=recipientDoc.id;const externalSenderId=String(sender.providerSenderId||sender.name||senderValue);const externalSenderName=String(sender.name||senderValue);const allowReplies=sender.allowReplies===true;const conversation=conversationId(senderUid,recipientUid);const messageRef=db.collection('appConversations').doc(conversation).collection('messages').doc();const now=Date.now();
     const message={id:messageRef.id,senderUid,senderId:externalSenderId,senderName:externalSenderName,recipientUid,recipientId:recipient.messagesId||'',text,createdAt:now,deliveredAt:0,readAt:0,deleted:false,source:'external_app',allowReplies};
     const conversationRef=db.collection('appConversations').doc(conversation);const senderProfileRef=db.collection('profiles').doc(senderUid);
     await db.runTransaction(async tx=>{tx.set(senderProfileRef,{uid:senderUid,messagesId:externalSenderId,displayName:externalSenderName,phoneNumber:'',photoUrl:'',fcmToken:'',enabled:true,allowReplies,updatedAt:now},{merge:true});tx.set(messageRef,message);tx.set(conversationRef,{participants:[senderUid,recipientUid],externalSenderId,lastText:text,lastAt:now,lastSenderUid:senderUid,updatedAt:now},{merge:true});});
-    return NextResponse.json({ok:true,data:{id:messageRef.id,status:'sent',notification:'queued_for_fcm',recipient:recipient.messagesId||null,sender_id:externalSenderId,allow_replies:allowReplies}});
+    try{
+      await firebaseMessaging().send({
+        token:fcmToken,
+        notification:{title:externalSenderName,body:text.slice(0,180)},
+        data:{type:'app_message',conversationId:conversation,messageId:messageRef.id,senderUid,senderId:externalSenderId,senderName:externalSenderName,allowReplies:String(allowReplies)},
+        android:{priority:'high',notification:{channelId:'chat'}}
+      });
+      await messageRef.update({deliveredAt:Date.now()});
+      return NextResponse.json({ok:true,data:{id:messageRef.id,status:'delivered',recipient:recipient.messagesId||null,sender_id:externalSenderId,allow_replies:allowReplies}});
+    }catch(error:any){
+      const code=String(error?.code||'');
+      if(code.includes('registration-token-not-registered')||code.includes('invalid-registration-token'))await recipientDoc.ref.update({fcmToken:''});
+      return NextResponse.json({ok:false,error:'Messages SOM notification delivery failed',messageId:messageRef.id},{status:502});
+    }
   }catch(e:any){return NextResponse.json({ok:false,error:e?.message||'App message failed'},{status:500});}
 }
 function conversationId(a:string,b:string){return [a,b].sort().join('_');}
