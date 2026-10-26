@@ -47,7 +47,12 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 29 && !isDefaultSmsApp(this)) requestDefaultSmsRole() else requestPermissionsIfNeeded()
     }
 
-    override fun onResume() { super.onResume(); if (isDefaultSmsApp(this)) requestPermissionsIfNeeded() }
+    override fun onResume() { super.onResume(); if (isDefaultSmsApp(this)) { requestPermissionsIfNeeded(); syncMessagesSomProfile() } }
+
+    private fun syncMessagesSomProfile() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED) return
+        AppMessagingRepository().ensureSignedIn { result -> result.onSuccess { PhoneNumberAutoLinker.sync(this, AppMessagingRepository()) } }
+    }
 
     private fun requestDefaultSmsRole() {
         if (Build.VERSION.SDK_INT >= 29) {
@@ -67,7 +72,7 @@ class MainActivity : ComponentActivity() {
         val list = mutableListOf(Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS, Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_CONTACTS, Manifest.permission.RECEIVE_MMS, Manifest.permission.RECEIVE_WAP_PUSH, Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_PHONE_NUMBERS)
         if (Build.VERSION.SDK_INT >= 33) list += Manifest.permission.POST_NOTIFICATIONS
         val missing = list.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
-        if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
+        if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray()) else syncMessagesSomProfile()
     }
 }
 

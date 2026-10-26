@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.ListenerRegistration
 import com.messages.som.data.AppMessagingRepository
+import com.messages.som.data.DevicePhoneNumber
+import com.messages.som.data.PhoneNumberAutoLinker
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
