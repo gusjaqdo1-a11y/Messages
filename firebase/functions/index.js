@@ -16,13 +16,13 @@ exports.notifyNewAppMessage = onDocumentCreated('appConversations/{conversationI
   try {
     await getMessaging().send({
       token,
-      notification: { title, body },
       data: {
-        type: 'app_message', conversationId: String(event.params.conversationId), messageId: String(event.params.messageId),
+        type: 'app_message', title, body,
+        conversationId: String(event.params.conversationId), messageId: String(event.params.messageId),
         senderUid: String(message.senderUid), senderId: String(message.senderId || ''), senderName: String(message.senderName || ''),
         allowReplies: String(message.allowReplies !== false)
       },
-      android: { priority: 'high', notification: { channelId: 'chat' } }
+      android: { priority: 'high' }
     });
     await event.data.ref.update({ deliveredAt: Date.now() });
   } catch (error) {
