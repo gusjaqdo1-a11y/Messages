@@ -1,0 +1,5 @@
+import {NextResponse} from 'next/server';
+import crypto from 'crypto';
+import {firebaseDb} from '../../../../../lib/firebase-admin';
+function uidOf(id:string){return 'app:'+crypto.createHash('sha256').update(id).digest('hex').slice(0,40)}
+export async function POST(req:Request){try{const b=await req.json().catch(()=>({}));const installation=String(b.installation_id||'').trim(),other=String(b.other_uid||'').trim();if(installation.length<32||!other)return NextResponse.json({ok:false,error:'Invalid read request'},{status:400});const me=uidOf(installation),id=[me,other].sort().join('_'),db=firebaseDb(),snap=await db.collection('appConversations').doc(id).collection('messages').where('recipientUid','==',me).where('readAt','==',0).limit(100).get();if(!snap.empty){const batch=db.batch();snap.docs.forEach(d=>batch.update(d.ref,'readAt',Date.now()));await batch.commit()}return NextResponse.json({ok:true,data:{updated:snap.size}})}catch(e:any){return NextResponse.json({ok:false,error:e?.message||'Read update failed'},{status:500})}}
