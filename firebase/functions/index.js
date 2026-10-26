@@ -6,7 +6,7 @@ initializeApp();
 const db = getFirestore();
 exports.notifyNewAppMessage = onDocumentCreated('appConversations/{conversationId}/messages/{messageId}', async (event) => {
   const message = event.data?.data();
-  if (!message || !message.recipientUid || !message.senderUid || message.senderUid === message.recipientUid) return;
+  if (!message || message.source === 'external_app' || !message.recipientUid || !message.senderUid || message.senderUid === message.recipientUid) return;
   const profile = await db.collection('profiles').doc(message.recipientUid).get();
   if (!profile.exists) return;
   const token = profile.data()?.fcmToken;
