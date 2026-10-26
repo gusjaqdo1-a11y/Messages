@@ -33,6 +33,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.messages.som.data.AppMessagingRepository
+import com.messages.som.data.PhoneNumberAutoLinker
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

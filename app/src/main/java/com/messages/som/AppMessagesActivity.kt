@@ -1,5 +1,8 @@
 package com.messages.som
 
+import android.Manifest
+import android.content.pm.PackageManager
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -52,6 +55,14 @@ private fun AppMessagesScreen(activity: AppMessagesActivity) {
     var search by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<AppMessagingRepository.AppProfile>>(emptyList()) }
+
+    LaunchedEffect(profile?.uid) {
+        val current = profile ?: return@LaunchedEffect
+        if (current.phoneNumber.isBlank() && ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED) {
+            PhoneNumberAutoLinker.sync(activity, repo)
+            DevicePhoneNumber.read(activity)?.let { detected -> profile = current.copy(phoneNumber = detected) }
+        }
+    }
 
     LaunchedEffect(Unit) {
         repo.ensureSignedIn { r ->
