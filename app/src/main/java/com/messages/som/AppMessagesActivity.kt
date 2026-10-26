@@ -2,7 +2,6 @@ package com.messages.som
 
 import android.Manifest
 import android.content.pm.PackageManager
-
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -28,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import com.google.firebase.firestore.ListenerRegistration
 import com.messages.som.data.AppMessagingRepository
 import com.messages.som.data.DevicePhoneNumber
@@ -39,6 +39,9 @@ import java.util.Locale
 class AppMessagesActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (androidx.core.content.ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_PHONE_NUMBERS), 7001)
+        }
         setContent { MessagesSomTheme { AppMessagesScreen(this) } }
     }
 }
@@ -53,21 +56,24 @@ private fun AppMessagesScreen(activity: AppMessagesActivity) {
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
     var search by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<AppMessagingRepository.AppProfile>>(emptyList()) }
 
     LaunchedEffect(profile?.uid) {
         val current = profile ?: return@LaunchedEffect
-        if (current.phoneNumber.isBlank() && ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED) {
-            PhoneNumberAutoLinker.sync(activity, repo)
-            DevicePhoneNumber.read(activity)?.let { detected -> profile = current.copy(phoneNumber = detected) }
+        if (current.phoneNumber.isBlank() && androidx.core.content.ContextCompat.checkSelfPermission(activity, Manifest.permission.READ_PHONE_NUMBERS) == PackageManager.PERMISSION_GRANTED) {
+            val detected = DevicePhoneNumber.read(activity)
+            if (!detected.isNullOrBlank()) {
+                profile = current.copy(phoneNumber = detected)
+                PhoneNumberAutoLinker.sync(activity, repo)
+            }
         }
     }
 
     LaunchedEffect(Unit) {
         repo.ensureSignedIn { r ->
             r.onSuccess {
-                profile = it; phone = it.phoneNumber; loading = false
+                profile = it
+                loading = false
                 val conversation = activity.intent.getStringExtra("conversation_id").orEmpty()
                 val senderUid = activity.intent.getStringExtra("sender_uid").orEmpty()
                 val senderId = activity.intent.getStringExtra("sender_id").orEmpty()
@@ -75,7 +81,10 @@ private fun AppMessagesScreen(activity: AppMessagesActivity) {
                     selected = AppMessagingRepository.AppProfile(uid = senderUid, messagesId = senderId, displayName = activity.intent.getStringExtra("sender_name") ?: senderId, allowReplies = activity.intent.getBooleanExtra("allow_replies", true))
                     selectedConversation = conversation
                 }
-            }.onFailure { error = it.message ?: "Firebase setup is required"; loading = false }
+            }.onFailure {
+                error = it.message ?: "Unable to connect to Messages SOM"
+                loading = false
+            }
         }
     }
 
@@ -97,9 +106,14 @@ private fun AppMessagesScreen(activity: AppMessagesActivity) {
                             Text(me.messagesId, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                             Text(me.displayName, color = Color(0xFF9EA8B8), fontSize = 13.sp)
                             Spacer(Modifier.height(12.dp))
-                            OutlinedTextField(value = phone, onValueChange = { phone = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Your phone number") }, placeholder = { Text("+2519XXXXXXXX") }, shape = RoundedCornerShape(14.dp))
-                            Spacer(Modifier.height(7.dp))
-                            Button(onClick = { repo.updatePhoneNumber(phone) { r -> r.onSuccess { profile = profile?.copy(phoneNumber = phone.trim().replace(Regex("[\\s()-]"), "")); error = "Number linked successfully" }.onFailure { error = it.message ?: "Unable to link number" } } }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) { Text("Save number") }
+                            if (me.phoneNumber.isNotBlank()) {
+                                Text("Linked phone number", color = Color(0xFF8E98A8), fontSize = 11.sp)
+                                Text(me.phoneNumber, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                            } else {
+                                Text("Phone number", color = Color(0xFF8E98A8), fontSize = 11.sp)
+                                Text("SIM number could not be read automatically", color = Color(0xFFFFC27A), fontSize = 13.sp)
+                                Text("Your MSOM ID is still active for messaging.", color = Color(0xFF8F99A9), fontSize = 12.sp, modifier = Modifier.padding(top = 3.dp))
+                            }
                         }
                     }
                 }
@@ -108,7 +122,7 @@ private fun AppMessagesScreen(activity: AppMessagesActivity) {
                     IconButton(enabled = search.trim().length >= 5, onClick = { val value = search.trim(); val callback: (Result<List<AppMessagingRepository.AppProfile>>) -> Unit = { r -> r.onSuccess { results = it; if (it.isEmpty()) error = "No Messages SOM user found" }.onFailure { error = it.message ?: "Search failed" } }; if (value.uppercase(Locale.US).startsWith("MSOM-")) repo.searchByMessagesId(value, callback) else repo.searchByPhone(value, callback) }) { Icon(Icons.Default.PersonAdd, "Find user") }
                 }, shape = RoundedCornerShape(18.dp))
                 if (results.isNotEmpty()) { Spacer(Modifier.height(8.dp)); results.forEach { user -> UserRow(user) { selected = user; selectedConversation = null } } }
-                if (error.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text(error, color = if (error.contains("success", true)) Color(0xFF8FE3B0) else Color(0xFFFFA8A0), fontSize = 12.sp) }
+                if (error.isNotBlank()) { Spacer(Modifier.height(8.dp)); Text(error, color = Color(0xFFFFA8A0), fontSize = 12.sp) }
                 Spacer(Modifier.height(18.dp)); Text("App-to-app messaging", color = Color.White, fontWeight = FontWeight.SemiBold)
                 Text("Connected apps can send through Messages SOM Sender IDs. Messages stay inside the Messages SOM network and do not use carrier SMS.", color = Color(0xFF8993A3), fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
             }
