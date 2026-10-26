@@ -31,16 +31,16 @@ class AppMessagingRepository(
     private fun withFirestoreNetwork(action: () -> Unit, attempt: Int = 0) {
         db.enableNetwork()
             .addOnSuccessListener { action() }
-            .addOnFailureListener { error ->
+            .addOnFailureListener {
                 if (attempt < 3) {
-                    mainHandler.postDelayed({ withFirestoreNetwork(action, attempt + 1) }, 750L * (attempt + 1))
+                    mainHandler.postDelayed({ withFirestoreNetwork(action = action, attempt = attempt + 1) }, 750L * (attempt + 1))
                 } else {
                     action()
                 }
             }
     }
 
-    private fun isTransient(error: Exception): Boolean =
+    private fun isTransient(error: Throwable): Boolean =
         (error is FirebaseFirestoreException && error.code in setOf(
             FirebaseFirestoreException.Code.UNAVAILABLE,
             FirebaseFirestoreException.Code.DEADLINE_EXCEEDED,
@@ -52,7 +52,7 @@ class AppMessagingRepository(
         onResult: (Result<T>) -> Unit,
         attempt: Int = 0
     ) {
-        withFirestoreNetwork {
+        withFirestoreNetwork(action = {
             operation().addOnSuccessListener { onResult(Result.success(it)) }.addOnFailureListener { error ->
                 if (attempt < 3 && isTransient(error)) {
                     mainHandler.postDelayed({ runFirestore(operation, onResult, attempt + 1) }, 1000L * (attempt + 1))
@@ -60,7 +60,7 @@ class AppMessagingRepository(
                     onResult(Result.failure(error))
                 }
             }
-        }
+        })
     }
 
     fun ensureSignedIn(onResult: (Result<AppProfile>) -> Unit) {
@@ -70,7 +70,11 @@ class AppMessagingRepository(
             return
         }
         auth.signInAnonymously()
-            .addOnSuccessListener { user -> ensureProfile(user.uid, user.displayName.orEmpty(), onResult) }
+            .addOnSuccessListener { result ->
+                val user = result.user
+                if (user != null) ensureProfile(user.uid, user.displayName.orEmpty(), onResult)
+                else onResult(Result.failure(IllegalStateException("Firebase sign-in returned no user")))
+            }
             .addOnFailureListener { onResult(Result.failure(it)) }
     }
 
@@ -91,11 +95,12 @@ class AppMessagingRepository(
         })
     }
 
-    private fun friendlyFirestoreError(error: Exception): Exception {
+    private fun friendlyFirestoreError(error: Throwable): Exception {
         val message = error.message.orEmpty()
-        return if (message.contains("client is offline", true)) {
-            IllegalStateException("Messages SOM cannot reach Firebase right now. Check internet access and try again.", error)
-        } else error
+        if (message.contains("client is offline", true)) {
+            return IllegalStateException("Messages SOM cannot reach Firebase right now. Check internet access and try again.", error)
+        }
+        return if (error is Exception) error else IllegalStateException(message.ifBlank { "Firebase operation failed" }, error)
     }
 
     fun updatePhoneNumber(phone: String, onResult: (Result<Unit>) -> Unit) {
@@ -177,14 +182,14 @@ class AppMessagingRepository(
 
     fun observeConversationId(id: String, onChange: (List<AppMessage>) -> Unit, onError: (Exception) -> Unit): ListenerRegistration? {
         var listener: ListenerRegistration? = null
-        withFirestoreNetwork {
+        withFirestoreNetwork(action = {
             listener = db.collection("appConversations").document(id).collection("messages")
                 .orderBy("createdAt", Query.Direction.ASCENDING).limitToLast(500)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) { onError(friendlyFirestoreError(error)); return@addSnapshotListener }
                     onChange(snapshot?.documents.orEmpty().mapNotNull { it.toObject(AppMessage::class.java) }.filter { !it.deleted })
                 }
-        }
+        })
         return listener
     }
 
