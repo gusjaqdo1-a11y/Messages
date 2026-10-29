@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 class AppMessagingApiRepository(private val context: Context) {
     data class AppProfile(val uid:String="",val messagesId:String="",val displayName:String="",val phoneNumber:String="",val photoUrl:String="",val fcmToken:String="",val enabled:Boolean=true,val createdAt:Long=0L,val updatedAt:Long=0L,val allowReplies:Boolean=true)
     data class AppMessage(val id:String="",val senderUid:String="",val senderId:String="",val senderName:String="",val recipientUid:String="",val recipientId:String="",val text:String="",val createdAt:Long=0L,val deliveredAt:Long=0L,val readAt:Long=0L,val deleted:Boolean=false,val mine:Boolean=false)
-    companion object { private const val BASE_URL="https://messages-som-api.vercel.app/api/v1/app-messages"; private const val PREFS="messages_som_network"; private const val INSTALL_ID="installation_id" }
+    companion object { private const val BASE_URL="https://messages-som-api.vercel.app/api/v1/app-messages"; private const val PREFS="messages_som_network"; private const val INSTALL_ID="installation_id"; private const val FCM_TOKEN="fcm_token" }
     private val executor=Executors.newFixedThreadPool(3)
     private val prefs=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
 
@@ -39,9 +39,7 @@ class AppMessagingApiRepository(private val context: Context) {
             val stream=if(code in 200..299)connection.inputStream else connection.errorStream
             val text=stream?.bufferedReader()?.use{it.readText()}.orEmpty()
             val json=if(text.isBlank())JSONObject()else JSONObject(text)
-            if(code !in 200..299||!json.optBoolean("ok",false)) {
-                throw IllegalStateException(json.optString("error").ifBlank{"Messages SOM server error ($code)"})
-            }
+            if(code !in 200..299||!json.optBoolean("ok",false)) throw IllegalStateException(json.optString("error").ifBlank{"Messages SOM server error ($code)"})
             json
         } finally { connection.disconnect() }
     }
@@ -49,14 +47,32 @@ class AppMessagingApiRepository(private val context: Context) {
     fun ensureRegistered(onResult:(Result<AppProfile>)->Unit){
         executor.execute {
             try {
-                val token=runCatching{Tasks.await(FirebaseMessaging.getInstance().token,15,TimeUnit.SECONDS)}.getOrDefault("")
+                val token=runCatching{Tasks.await(FirebaseMessaging.getInstance().token,15,TimeUnit.SECONDS)}.getOrElse{prefs.getString(FCM_TOKEN,"").orEmpty()}
+                if(token.isNotBlank()) prefs.edit().putString(FCM_TOKEN,token).apply()
                 registerWithToken(token,onResult)
             } catch(e:Throwable){onResult(Result.failure(e))}
         }
     }
 
     fun refreshRegistration(fcmToken:String,onResult:(Result<AppProfile>)->Unit={}){
-        executor.execute { registerWithToken(fcmToken,onResult) }
+        executor.execute {
+            val token=fcmToken.trim()
+            if(token.isNotBlank()) prefs.edit().putString(FCM_TOKEN,token).apply()
+            registerWithToken(token,onResult)
+        }
+    }
+
+    fun linkPhone(phone:String,onResult:(Result<AppProfile>)->Unit){
+        executor.execute {
+            try {
+                val value=phone.trim().replace(Regex("[\\s()-]"),"")
+                if(!Regex("^\\+?[1-9]\\d{6,14}$").matches(value)) throw IllegalArgumentException("Use an international number, e.g. +2519XXXXXXXX")
+                val token=prefs.getString(FCM_TOKEN,"").orEmpty().ifBlank{runCatching{Tasks.await(FirebaseMessaging.getInstance().token,15,TimeUnit.SECONDS)}.getOrDefault("")}
+                if(token.isNotBlank()) prefs.edit().putString(FCM_TOKEN,token).apply()
+                val json=request("/register",common().put("phone_number",value).put("fcm_token",token).put("display_name","Messages SOM user"))
+                onResult(Result.success(profile(json.getJSONObject("data"))))
+            } catch(e:Throwable){onResult(Result.failure(e))}
+        }
     }
 
     private fun registerWithToken(token:String,onResult:(Result<AppProfile>)->Unit){
