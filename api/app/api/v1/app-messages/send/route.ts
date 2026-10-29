@@ -1,7 +1,7 @@
 import {NextResponse} from 'next/server';
 import crypto from 'crypto';
 import {authorizedKey,hasScope,readData,countryFromNumber,normalizeNumber} from '../../../../../lib/sms';
-import {firebaseDb} from '../../../../../lib/firebase-admin';
+import {firebaseDb,firebaseMessaging} from '../../../../../lib/firebase-admin';
 
 function uidOf(id:string){return 'app:'+crypto.createHash('sha256').update(id).digest('hex').slice(0,40)}
 function conversationId(a:string,b:string){return [a,b].sort().join('_')}
@@ -22,11 +22,16 @@ export async function POST(req:Request){
       if(!rs.exists||rs.data()?.enabled===false)return NextResponse.json({ok:false,error:'Messages SOM user not found'},{status:404});
       const sender=ss.data()!,recipient=rs.data()!;
       if(sender.enabled===false)return NextResponse.json({ok:false,error:'Your Messages SOM account is disabled'},{status:403});
-      if(!String(recipient.fcmToken||'').trim())return NextResponse.json({ok:false,error:'Recipient is not currently reachable'},{status:503});
+      const token=String(recipient.fcmToken||'').trim();
+      if(!token)return NextResponse.json({ok:false,error:'Recipient is not currently reachable'},{status:503});
       const conversation=conversationId(senderUid,recipientUid),conversationRef=db.collection('appConversations').doc(conversation),ref=conversationRef.collection('messages').doc(),now=Date.now();
       const msg={id:ref.id,senderUid,senderId:sender.messagesId||'',senderName:sender.displayName||'Messages SOM user',recipientUid,recipientId:recipient.messagesId||'',text,createdAt:now,deliveredAt:0,readAt:0,deleted:false,source:'messages_som',allowReplies:true};
       await db.runTransaction(async tx=>{tx.set(ref,msg);tx.set(conversationRef,{participants:[senderUid,recipientUid],lastText:text,lastAt:now,lastSenderUid:senderUid,updatedAt:now},{merge:true})});
-      return NextResponse.json({ok:true,data:{id:ref.id,status:'queued',notification:'queued_for_fcm'}});
+      try{
+        await firebaseMessaging().send({token,data:{type:'app_message',title:sender.displayName||sender.messagesId||'Messages SOM',body:text.slice(0,180),conversationId:conversation,messageId:ref.id,senderUid,senderId:sender.messagesId||'',senderName:sender.displayName||'',allowReplies:'true'},android:{priority:'high'}});
+        await ref.update({deliveredAt:Date.now()});
+        return NextResponse.json({ok:true,data:{id:ref.id,status:'delivered'}})
+      }catch(e:any){return NextResponse.json({ok:false,error:'Message notification delivery failed',messageId:ref.id},{status:502})}
     }
 
     const key=authorizedKey(req),data=await readData();
@@ -53,6 +58,6 @@ export async function POST(req:Request){
     const message={id:messageRef.id,senderUid,senderId:externalSenderId,senderName:externalSenderName,recipientUid:externalRecipientUid,recipientId:recipient.messagesId||'',text,createdAt:now,deliveredAt:0,readAt:0,deleted:false,source:'external_app',allowReplies};
     const conversationRef=db.collection('appConversations').doc(conversation),senderProfileRef=db.collection('profiles').doc(senderUid);
     await db.runTransaction(async tx=>{tx.set(senderProfileRef,{uid:senderUid,messagesId:externalSenderId,displayName:externalSenderName,phoneNumber:'',photoUrl:'',fcmToken:'',enabled:true,allowReplies,updatedAt:now},{merge:true});tx.set(messageRef,message);tx.set(conversationRef,{participants:[senderUid,externalRecipientUid],externalSenderId,lastText:text,lastAt:now,lastSenderUid:senderUid,updatedAt:now},{merge:true})});
-    return NextResponse.json({ok:true,data:{id:messageRef.id,status:'queued',notification:'queued_for_fcm',recipient:recipient.messagesId||null,sender_id:externalSenderId,allow_replies:allowReplies}});
+    return NextResponse.json({ok:true,data:{id:messageRef.id,status:'sent',notification:'queued_for_fcm',recipient:recipient.messagesId||null,sender_id:externalSenderId,allow_replies:allowReplies}});
   }catch(e:any){return NextResponse.json({ok:false,error:e?.message||'App message failed'},{status:500})}
 }
