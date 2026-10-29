@@ -9,6 +9,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class AppMessagingApiRepository(private val context: Context) {
     data class AppProfile(val uid:String="",val messagesId:String="",val displayName:String="",val phoneNumber:String="",val photoUrl:String="",val fcmToken:String="",val enabled:Boolean=true,val createdAt:Long=0L,val updatedAt:Long=0L,val allowReplies:Boolean=true)
@@ -16,10 +17,60 @@ class AppMessagingApiRepository(private val context: Context) {
     companion object { private const val BASE_URL="https://messages-som-api.vercel.app/api/v1/app-messages"; private const val PREFS="messages_som_network"; private const val INSTALL_ID="installation_id" }
     private val executor=Executors.newFixedThreadPool(3)
     private val prefs=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
-    private fun installationId():String { val old=prefs.getString(INSTALL_ID,null); if(!old.isNullOrBlank()) return old; val v=UUID.randomUUID().toString()+UUID.randomUUID().toString(); prefs.edit().putString(INSTALL_ID,v).apply(); return v }
+
+    private fun installationId():String {
+        val old=prefs.getString(INSTALL_ID,null)
+        if(!old.isNullOrBlank()) return old
+        val value=UUID.randomUUID().toString()+UUID.randomUUID().toString()
+        prefs.edit().putString(INSTALL_ID,value).apply()
+        return value
+    }
+
     private fun common()=JSONObject().put("installation_id",installationId())
-    private fun request(path:String,body:JSONObject):JSONObject { val c=(URL(BASE_URL+path).openConnection() as HttpURLConnection).apply{requestMethod="POST";connectTimeout=15000;readTimeout=20000;doOutput=true;setRequestProperty("Content-Type","application/json");setRequestProperty("Accept","application/json")}; return try{c.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}; val stream=if(c.responseCode in 200..299)c.inputStream else c.errorStream; val text=stream?.bufferedReader()?.use{it.readText()}.orEmpty(); val json=if(text.isBlank())JSONObject()else JSONObject(text); if(c.responseCode !in 200..299||!json.optBoolean("ok",false))throw IllegalStateException(json.optString("error").ifBlank{"Messages SOM server error (${c.responseCode})"}); json}finally{c.disconnect()} }
-    fun ensureRegistered(onResult:(Result<AppProfile>)->Unit){executor.execute{try{val token=try{Tasks.await(FirebaseMessaging.getInstance().token,15,java.util.concurrent.TimeUnit.SECONDS)}catch(_:Throwable){""};val phone=DevicePhoneNumber.read(context).orEmpty();val json=request("/register",common().put("phone_number",phone).put("fcm_token",token).put("display_name","Messages SOM user"));onResult(Result.success(profile(json.getJSONObject("data"))))}catch(e:Throwable){onResult(Result.failure(e))}}}
+
+    private fun request(path:String,body:JSONObject):JSONObject {
+        val connection=(URL(BASE_URL+path).openConnection() as HttpURLConnection).apply {
+            requestMethod="POST";connectTimeout=15000;readTimeout=20000;doOutput=true
+            setRequestProperty("Content-Type","application/json");setRequestProperty("Accept","application/json")
+        }
+        return try {
+            connection.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
+            val code=connection.responseCode
+            val stream=if(code in 200..299)connection.inputStream else connection.errorStream
+            val text=stream?.bufferedReader()?.use{it.readText()}.orEmpty()
+            val json=if(text.isBlank())JSONObject()else JSONObject(text)
+            if(code !in 200..299||!json.optBoolean("ok",false)) {
+                val detail=json.optString("error").ifBlank{"Messages SOM server error ($code)"}
+                throw IllegalStateException(detail)
+            }
+            json
+        } finally { connection.disconnect() }
+    }
+
+    fun ensureRegistered(onResult:(Result<AppProfile>)->Unit){
+        executor.execute {
+            try {
+                val token=runCatching{Tasks.await(FirebaseMessaging.getInstance().token,15,TimeUnit.SECONDS)}.getOrDefault("")
+                registerWithToken(token,onResult)
+            } catch(e:Throwable){onResult(Result.failure(e))}
+        }
+    }
+
+    fun refreshRegistration(fcmToken:String,onResult:(Result<AppProfile>)->Unit={}){
+        executor.execute {
+            try { registerWithToken(fcmToken,onResult) }
+            catch(e:Throwable){onResult(Result.failure(e))}
+        }
+    }
+
+    private fun registerWithToken(token:String,onResult:(Result<AppProfile>)->Unit){
+        try {
+            val phone=DevicePhoneNumber.read(context).orEmpty()
+            val json=request("/register",common().put("phone_number",phone).put("fcm_token",token.trim()).put("display_name","Messages SOM user"))
+            onResult(Result.success(profile(json.getJSONObject("data"))))
+        } catch(e:Throwable){onResult(Result.failure(e))}
+    }
+
     fun search(value:String,onResult:(Result<List<AppProfile>>)->Unit){executor.execute{try{val json=request("/search",common().put("query",value.trim()));val a=json.optJSONArray("data")?:JSONArray();onResult(Result.success(buildList{for(i in 0 until a.length())add(profile(a.getJSONObject(i)))}))}catch(e:Throwable){onResult(Result.failure(e))}}}
     fun send(recipient:AppProfile,text:String,onResult:(Result<String>)->Unit){executor.execute{try{val json=request("/send",common().put("recipient_uid",recipient.uid).put("message",text.trim()));onResult(Result.success(json.getJSONObject("data").optString("id")))}catch(e:Throwable){onResult(Result.failure(e))}}}
     fun conversation(otherUid:String,onResult:(Result<List<AppMessage>>)->Unit){executor.execute{try{val json=request("/conversation",common().put("other_uid",otherUid));val a=json.optJSONArray("data")?:JSONArray();onResult(Result.success(buildList{for(i in 0 until a.length())add(message(a.getJSONObject(i)))}))}catch(e:Throwable){onResult(Result.failure(e))}}}
