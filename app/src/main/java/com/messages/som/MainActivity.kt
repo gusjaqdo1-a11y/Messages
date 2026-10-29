@@ -26,22 +26,21 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.messages.som.data.AppMessagingRepository
-import com.messages.som.data.PhoneNumberAutoLinker
+import com.messages.som.data.AppMessagingApiRepository
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val roleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { requestPermissionsIfNeeded() }
-    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+    private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { requestPermissionsIfNeeded() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,7 +52,7 @@ class MainActivity : ComponentActivity() {
 
     private fun syncMessagesSomProfile() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_NUMBERS) != PackageManager.PERMISSION_GRANTED) return
-        AppMessagingRepository().ensureSignedIn { result -> result.onSuccess { PhoneNumberAutoLinker.sync(this, AppMessagingRepository()) } }
+        AppMessagingApiRepository(this).ensureRegistered { }
     }
 
     private fun requestDefaultSmsRole() {
@@ -144,7 +143,7 @@ private fun MainScreen(activity: MainActivity, requestRole: () -> Unit, requestP
             SetupBanner(defaultSms, requestRole)
             if (filtered.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.MarkUnreadChatAlt, null, tint = Color(0xFF718096), modifier = Modifier.size(52.dp)); Spacer(Modifier.height(10.dp)); Text(if (query.isBlank()) "No conversations yet" else "No results", color = Color.White, fontSize = 18.sp); Text(if (query.isBlank()) "Use the chat icon for Messages SOM users, or compose an SMS." else "Try another search.", color = Color(0xFF8993A3)) }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.MarkUnreadChatAlt, null, tint = Color(0xFF718096), modifier = Modifier.size(52.dp)); Spacer(Modifier.height(10.dp)); Text(if (query.isBlank()) "No conversations yet" else "No results", color = Color.White, fontSize = 18.sp); Text(if (query.isBlank()) "Use the chat icon for Messages SOM, or compose an SMS." else "Try another search.", color = Color(0xFF8993A3)) }
                 }
             } else {
                 LazyColumn(contentPadding = PaddingValues(bottom = 92.dp), modifier = Modifier.fillMaxSize()) { items(filtered, key = { it.address }) { c -> ConversationRow(activity, c) { refresh() } } }
@@ -181,11 +180,7 @@ private fun ConversationRow(activity: MainActivity, c: Conversation, refresh: ()
 
 @Composable
 private fun UnreadBadge(unread: Int) {
-    if (unread > 0) {
-        Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (unread > 99) "99+" else unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) }
-    } else {
-        Spacer(Modifier.width(0.dp))
-    }
+    if (unread > 0) { Spacer(Modifier.width(8.dp)); Surface(color = Color(0xFFA8C7FA), shape = CircleShape) { Text(if (unread > 99) "99+" else unread.toString(), color = Color(0xFF0A305F), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)) } }
 }
 
 @Composable
