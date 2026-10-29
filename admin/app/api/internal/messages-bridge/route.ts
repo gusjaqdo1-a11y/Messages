@@ -6,9 +6,10 @@ function uidOf(installation: string) { return 'app:' + crypto.createHash('sha256
 function apiUid(senderId: string) { return 'api:' + crypto.createHash('sha256').update(senderId).digest('hex').slice(0, 40); }
 function conversationId(a: string, b: string) { return [a, b].sort().join('_'); }
 function normalizeNumber(value: unknown) { return String(value ?? '').trim().replace(/[\s()-]/g, ''); }
-function okBridge(req: Request) {
-  const expected = process.env.MESSAGES_BRIDGE_SECRET?.trim();
-  const supplied = req.headers.get('x-messages-bridge-secret')?.trim() || '';
+function authorizedBridge(req: Request) {
+  const expected = process.env.MESSAGES_BRIDGE_API_KEY?.trim();
+  const header = req.headers.get('authorization') || '';
+  const supplied = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   if (!expected || !supplied) return false;
   const a = Buffer.from(expected); const b = Buffer.from(supplied);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
@@ -18,7 +19,7 @@ function publicProfile(data: any) {
 }
 
 export async function POST(req: Request) {
-  if (!okBridge(req)) return NextResponse.json({ ok: false, error: 'Unauthorized bridge request' }, { status: 401 });
+  if (!authorizedBridge(req)) return NextResponse.json({ ok: false, error: 'Unauthorized bridge request' }, { status: 401 });
   try {
     const body = await req.json().catch(() => ({}));
     const op = String(body.op || '').trim();
