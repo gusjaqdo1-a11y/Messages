@@ -4,7 +4,7 @@ import { getMessaging, type Messaging } from 'firebase-admin/messaging';
 
 let app: App | undefined;
 
-function firebaseApp(): App {
+export function firebaseApp(): App {
   if (app) return app;
   const existing = getApps()[0];
   if (existing) { app = existing; return existing; }
