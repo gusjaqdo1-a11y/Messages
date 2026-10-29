@@ -6,15 +6,16 @@ const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 initializeApp();
 const db = getFirestore();
 
-// One delivery path for every Messages SOM network message.
-// The API writes the message; this function is the single FCM sender.
+// External Sender ID messages are written by the API and delivered here.
+// Internal Messages SOM user-to-user messages are delivered directly by the API,
+// so they are intentionally ignored here to prevent duplicate notifications.
 exports.notifyNewAppMessage = onDocumentCreated('appConversations/{conversationId}/messages/{messageId}', async (event) => {
   const message = event.data?.data();
-  if (!message || !message.recipientUid || !message.senderUid || message.senderUid === message.recipientUid) return;
+  if (!message || message.source !== 'external_app' || !message.recipientUid || !message.senderUid || message.senderUid === message.recipientUid) return;
 
   const profile = await db.collection('profiles').doc(message.recipientUid).get();
   if (!profile.exists) return;
-  const token = String(profile.data()?.fcmToken || '').trim();
+  const token = profile.data()?.fcmToken;
   if (!token) return;
 
   const title = message.senderName || message.senderId || 'Messages SOM';
@@ -24,16 +25,22 @@ exports.notifyNewAppMessage = onDocumentCreated('appConversations/{conversationI
       token,
       data: {
         type: 'app_message', title, body,
-        conversationId: String(event.params.conversationId), messageId: String(event.params.messageId),
-        senderUid: String(message.senderUid), senderId: String(message.senderId || ''), senderName: String(message.senderName || ''),
-        allowReplies: String(message.allowReplies !== false)
+        conversationId: String(event.params.conversationId),
+        messageId: String(event.params.messageId),
+        senderUid: String(message.senderUid),
+        senderId: String(message.senderId || ''),
+        senderName: String(message.senderName || ''),
+        allowReplies: String(message.allowReplies === true)
       },
       android: { priority: 'high' }
     });
     await event.data.ref.update({ deliveredAt: Date.now() });
   } catch (error) {
     const code = error?.code || '';
-    if (code.includes('registration-token-not-registered') || code.includes('invalid-registration-token')) await profile.ref.update({ fcmToken: '' });
-    else console.error('Messages SOM FCM delivery failed', error);
+    if (code.includes('registration-token-not-registered') || code.includes('invalid-registration-token')) {
+      await profile.ref.update({ fcmToken: '' });
+    } else {
+      console.error('Messages SOM external FCM delivery failed', error);
+    }
   }
 });
