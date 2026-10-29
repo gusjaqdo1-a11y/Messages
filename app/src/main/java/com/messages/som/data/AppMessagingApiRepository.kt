@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 
 class AppMessagingApiRepository(private val context: Context) {
     data class AppProfile(val uid:String="",val messagesId:String="",val displayName:String="",val phoneNumber:String="",val photoUrl:String="",val fcmToken:String="",val enabled:Boolean=true,val createdAt:Long=0L,val updatedAt:Long=0L,val allowReplies:Boolean=true)
-    data class AppMessage(val id:String="",val senderUid:String="",val senderId:String="",val senderName:String="",val recipientUid:String="",val recipientId:String="",val text:String="",val createdAt:Long=0L,val deliveredAt:Long=0L,val readAt:Long=0L,val deleted:Boolean=false)
+    data class AppMessage(val id:String="",val senderUid:String="",val senderId:String="",val senderName:String="",val recipientUid:String="",val recipientId:String="",val text:String="",val createdAt:Long=0L,val deliveredAt:Long=0L,val readAt:Long=0L,val deleted:Boolean=false,val mine:Boolean=false)
     companion object { private const val BASE_URL="https://messages-som-api.vercel.app/api/v1/app-messages"; private const val PREFS="messages_som_network"; private const val INSTALL_ID="installation_id" }
     private val executor=Executors.newFixedThreadPool(3)
     private val prefs=context.getSharedPreferences(PREFS,Context.MODE_PRIVATE)
@@ -40,8 +40,7 @@ class AppMessagingApiRepository(private val context: Context) {
             val text=stream?.bufferedReader()?.use{it.readText()}.orEmpty()
             val json=if(text.isBlank())JSONObject()else JSONObject(text)
             if(code !in 200..299||!json.optBoolean("ok",false)) {
-                val detail=json.optString("error").ifBlank{"Messages SOM server error ($code)"}
-                throw IllegalStateException(detail)
+                throw IllegalStateException(json.optString("error").ifBlank{"Messages SOM server error ($code)"})
             }
             json
         } finally { connection.disconnect() }
@@ -57,10 +56,7 @@ class AppMessagingApiRepository(private val context: Context) {
     }
 
     fun refreshRegistration(fcmToken:String,onResult:(Result<AppProfile>)->Unit={}){
-        executor.execute {
-            try { registerWithToken(fcmToken,onResult) }
-            catch(e:Throwable){onResult(Result.failure(e))}
-        }
+        executor.execute { registerWithToken(fcmToken,onResult) }
     }
 
     private fun registerWithToken(token:String,onResult:(Result<AppProfile>)->Unit){
@@ -76,5 +72,5 @@ class AppMessagingApiRepository(private val context: Context) {
     fun conversation(otherUid:String,onResult:(Result<List<AppMessage>>)->Unit){executor.execute{try{val json=request("/conversation",common().put("other_uid",otherUid));val a=json.optJSONArray("data")?:JSONArray();onResult(Result.success(buildList{for(i in 0 until a.length())add(message(a.getJSONObject(i)))}))}catch(e:Throwable){onResult(Result.failure(e))}}}
     fun markRead(otherUid:String,onResult:(Result<Unit>)->Unit={}){executor.execute{try{request("/read",common().put("other_uid",otherUid));onResult(Result.success(Unit))}catch(e:Throwable){onResult(Result.failure(e))}}}
     private fun profile(o:JSONObject)=AppProfile(o.optString("uid"),o.optString("messagesId"),o.optString("displayName"),o.optString("phoneNumber"),o.optString("photoUrl"),o.optString("fcmToken"),o.optBoolean("enabled",true),o.optLong("createdAt"),o.optLong("updatedAt"),o.optBoolean("allowReplies",true))
-    private fun message(o:JSONObject)=AppMessage(o.optString("id"),o.optString("senderUid"),o.optString("senderId"),o.optString("senderName"),o.optString("recipientUid"),o.optString("recipientId"),o.optString("text"),o.optLong("createdAt"),o.optLong("deliveredAt"),o.optLong("readAt"),o.optBoolean("deleted",false))
+    private fun message(o:JSONObject)=AppMessage(o.optString("id"),o.optString("senderUid"),o.optString("senderId"),o.optString("senderName"),o.optString("recipientUid"),o.optString("recipientId"),o.optString("text"),o.optLong("createdAt"),o.optLong("deliveredAt"),o.optLong("readAt"),o.optBoolean("deleted",false),o.optBoolean("mine",false))
 }
