@@ -2,6 +2,7 @@ package com.messages.som.data
 
 import android.content.Context
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import org.json.JSONArray
 import org.json.JSONObject
@@ -28,10 +29,19 @@ class AppMessagingApiRepository(private val context: Context) {
 
     private fun common()=JSONObject().put("installation_id",installationId())
 
+    private fun authToken(): String {
+        val auth=FirebaseAuth.getInstance()
+        val user=auth.currentUser ?: Tasks.await(auth.signInAnonymously(),15,TimeUnit.SECONDS).user
+            ?: throw IllegalStateException("Firebase authentication could not create an app identity")
+        return Tasks.await(user.getIdToken(false),15,TimeUnit.SECONDS).token
+            ?: throw IllegalStateException("Firebase authentication returned no ID token")
+    }
+
     private fun request(path:String,body:JSONObject):JSONObject {
         val connection=(URL(BASE_URL+path).openConnection() as HttpURLConnection).apply {
             requestMethod="POST";connectTimeout=15000;readTimeout=20000;doOutput=true
             setRequestProperty("Content-Type","application/json");setRequestProperty("Accept","application/json")
+            setRequestProperty("Authorization","Bearer ${authToken()}")
         }
         return try {
             connection.outputStream.use{it.write(body.toString().toByteArray(Charsets.UTF_8))}
