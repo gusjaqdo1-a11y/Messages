@@ -4,11 +4,7 @@ import { messagesBridge } from '../../../../../lib/messages-bridge';
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const result = await messagesBridge({ op: 'conversation', installation_id: body.installation_id, other_uid: body.other_uid });
-    const installation = String(body.installation_id || '').trim();
-    const mePrefix = installation ? installation : '';
-    void mePrefix;
-    return NextResponse.json(result);
+    return NextResponse.json(await messagesBridge({ op: 'conversation', installation_id: body.installation_id, other_uid: body.other_uid }));
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'Conversation failed' }, { status: Number(e?.status) || 500 });
   }
